@@ -1,6 +1,6 @@
 [project]
 name = "presuplano-backend"
-version = "3.0.0"
+version = "3.2.0"
 description = "CUOTREKA — cotizador multi-tenant para arquitectos (backend API)"
 requires-python = ">=3.12"
 dependencies = [
@@ -59,6 +59,9 @@ pythonpath = ["src"]
 python_files = ["test_*.py", "tests.py"]
 addopts = "--reuse-db"
 testpaths = ["src"]
+markers = [
+    "no_cotas_mock: la lectura rápida de las cotas no se simula (se prueba la llamada real)",
+]
 
 [tool.coverage.run]
 source = ["src"]
