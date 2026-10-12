@@ -3,7 +3,7 @@
 Todas las notas de cambios relevantes de la API. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es-ES/) y versionado semántico.
 
-## [Unreleased] — iteracion-7
+## [3.2.0] — 2026-10-12 · iteracion-7: medidas antes de leer el plano y recorrido «Asignar materiales»
 
 ### Changed
 - **planner — US-129 Medidas antes de leer el plano:** tras limpiar la foto,
