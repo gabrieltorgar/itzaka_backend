@@ -76,11 +76,42 @@ def plan_reading(width: int, height: int) -> dict:
 def reads_a_house(mocker):
     """La IA lee una casa en la foto que recibe, con su tamaño."""
 
-    def fake(image: bytes, media_type: str) -> dict:
+    def fake(image: bytes, media_type: str, measures=None) -> dict:
         width, height = Image.open(io.BytesIO(image)).size
         return plan_reading(width, height)
 
     return mocker.patch.object(photo_conversion, "read_plan", side_effect=fake)
+
+
+def cotas_reading(width: int, height: int, *cotas) -> dict:
+    """Lo que la lectura rápida encuentra: sólo las cotas, en píxeles."""
+    return {
+        "is_floor_plan": True,
+        "image_width": width,
+        "image_height": height,
+        "dimensions": [
+            {"x1": x1, "y1": y1, "x2": x2, "y2": y2, "metres": metres}
+            for x1, y1, x2, y2, metres in cotas
+        ],
+    }
+
+
+def sees(mocker, *cotas):
+    """La lectura rápida de las cotas encuentra éstas, en la foto que recibe."""
+
+    def fake(image: bytes, media_type: str) -> dict:
+        width, height = Image.open(io.BytesIO(image)).size
+        return cotas_reading(width, height, *cotas)
+
+    return mocker.patch.object(photo_conversion, "read_cotas", side_effect=fake)
+
+
+@pytest.fixture(autouse=True)
+def legible_cotas(request, mocker):
+    """Por omisión el plano trae su ancho y su alto escritos y legibles."""
+    if "no_cotas_mock" in request.keywords:
+        return None
+    return sees(mocker, (0, 10, 1568, 10, 15.68), (10, 0, 10, 1176, 11.76))
 
 
 @pytest.mark.django_db
@@ -484,3 +515,230 @@ def mocker_request():
     import httpx2
 
     return httpx2.Request("POST", "https://api.anthropic.com/v1/messages")
+
+
+@pytest.mark.django_db
+class TestMeasuresBeforeReading:
+    """Cambio iteracion-7 - Las medidas del plano, antes de que lo lea la IA."""
+
+    def test_a_plan_with_its_width_and_height_written_is_read_at_their_scale(
+        self, authenticated_client, reads_a_house, legible_cotas
+    ):
+        """Cambio iteracion-7 - El plano trae sus medidas."""
+        response = authenticated_client.post(
+            URL, {"photo": upload()}, format="multipart"
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        assert "needs_measures" not in response.data
+        legible_cotas.assert_called_once()
+        # 1568 px de la foto pulida son 15,68 m: 1 cm por píxel.
+        assert response.data["scale"] == "cotas"
+        assert response.data["metres_per_pixel"] == pytest.approx(0.01)
+        # La cota se busca en la foto ya pulida, la misma que leerá la IA.
+        sent = legible_cotas.call_args.args[0]
+        assert sent == reads_a_house.call_args.args[0]
+
+    def test_without_cotas_the_measures_are_asked_before_reading(
+        self, authenticated_client, reads_a_house, mocker, user
+    ):
+        """Cambio iteracion-7 - El plano no trae medidas."""
+        sees(mocker)
+
+        response = authenticated_client.post(
+            URL, {"photo": upload()}, format="multipart"
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["needs_measures"] is True
+        assert response.data["missing"] == ["width", "height"]
+        # Con la foto pulida, para que el arquitecto sepa de qué lado se habla.
+        assert response.data["image"]["src"].startswith("data:image/png;base64,")
+        # La IA no lee el plano todavía, y no se gasta una foto del día.
+        reads_a_house.assert_not_called()
+        assert not PhotoConversion.objects.filter(owner=user).exists()
+        assert response.data["remaining_today"] == 5
+
+    def test_only_the_missing_side_is_asked(
+        self, authenticated_client, reads_a_house, mocker
+    ):
+        """Cambio iteracion-7 - Falta un solo lado."""
+        # Una cota horizontal legible; la vertical no se pudo leer (0).
+        sees(mocker, (0, 10, 784, 10, 7.84), (10, 0, 10, 600, 0))
+
+        response = authenticated_client.post(
+            URL, {"photo": upload()}, format="multipart"
+        )
+
+        assert response.data["missing"] == ["height"]
+
+    def test_with_the_measures_given_the_plan_comes_at_their_scale(
+        self, authenticated_client, reads_a_house, legible_cotas, user
+    ):
+        """Cambio iteracion-7 - Escalado con el ancho y el alto del cuestionario."""
+        response = authenticated_client.post(
+            URL,
+            {"photo": upload(), "width_m": "31.36", "height_m": "23.52"},
+            format="multipart",
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        # Ya no se buscan las cotas: las medidas las dio el arquitecto.
+        legible_cotas.assert_not_called()
+        # La IA las recibe para aproximar el resto de los muros.
+        assert reads_a_house.call_args.kwargs["measures"] == {
+            "width_m": 31.36,
+            "height_m": 23.52,
+        }
+        # Los muros leídos ocupan 1568 × 1176 px: 2 cm por píxel.
+        assert response.data["scale"] == "medidas"
+        assert response.data["metres_per_pixel"] == pytest.approx(0.02)
+        assert PhotoConversion.objects.filter(owner=user).count() == 1
+
+    def test_with_one_side_given_the_other_comes_from_its_cota(
+        self, authenticated_client, reads_a_house, mocker
+    ):
+        """Cambio iteracion-7 - Sólo se dio el lado que faltaba."""
+        response = authenticated_client.post(
+            URL, {"photo": upload(), "height_m": "23.52"}, format="multipart"
+        )
+
+        assert reads_a_house.call_args.kwargs["measures"] == {"height_m": 23.52}
+        assert response.data["metres_per_pixel"] == pytest.approx(0.02)
+
+    def test_going_on_without_measures_converts_as_before(
+        self, authenticated_client, reads_a_house, legible_cotas
+    ):
+        """Caso alternativo iteracion-7 - Seguir sin medidas."""
+        response = authenticated_client.post(
+            URL, {"photo": upload(), "skip_measures": "true"}, format="multipart"
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        legible_cotas.assert_not_called()
+        assert reads_a_house.call_args.kwargs["measures"] is None
+        assert response.data["scale"] is None
+        assert response.data["metres_per_pixel"] is None
+        assert len(response.data["walls"]) == 3
+
+    @pytest.mark.parametrize("value", ["0", "-2", "ocho"])
+    def test_a_measure_that_is_not_positive_is_refused(
+        self, authenticated_client, reads_a_house, value
+    ):
+        """Caso alternativo iteracion-7 - Medida inválida."""
+        response = authenticated_client.post(
+            URL, {"photo": upload(), "width_m": value}, format="multipart"
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.data["width_m"] == ["La medida debe ser mayor que 0"]
+        reads_a_house.assert_not_called()
+
+    def test_a_photo_that_is_not_a_plan_asks_nothing(
+        self, authenticated_client, reads_a_house, mocker
+    ):
+        """Caso de borde iteracion-7 - Si no es un plano, no hay cuestionario."""
+        mocker.patch.object(
+            photo_conversion,
+            "read_cotas",
+            return_value={**cotas_reading(10, 10), "is_floor_plan": False},
+        )
+
+        response = authenticated_client.post(
+            URL, {"photo": upload()}, format="multipart"
+        )
+
+        assert "needs_measures" not in response.data
+        reads_a_house.assert_called_once()
+
+    def test_when_the_quick_reading_fails_nothing_changes(
+        self, authenticated_client, reads_a_house, mocker, user
+    ):
+        """Caso alternativo iteracion-7 - La lectura de las cotas falla."""
+        mocker.patch.object(
+            photo_conversion, "read_cotas", side_effect=ConversionUnavailable
+        )
+
+        response = authenticated_client.post(
+            URL, {"photo": upload()}, format="multipart"
+        )
+
+        assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
+        assert not PhotoConversion.objects.filter(owner=user).exists()
+
+
+@pytest.mark.no_cotas_mock
+class TestReadCotas:
+    """La lectura rápida: sólo las cotas, con el mismo modelo y poco esfuerzo."""
+
+    @pytest.fixture
+    def client(self, mocker, settings):
+        settings.ANTHROPIC_API_KEY = "test-key"
+        fake = mocker.Mock()
+        mocker.patch.object(photo_conversion.anthropic, "Anthropic", return_value=fake)
+        return fake
+
+    def test_only_the_cotas_are_asked_for(self, client) -> None:
+        client.beta.messages.create.return_value = claude_reply(
+            {
+                "is_floor_plan": True,
+                "dimensions": [{"x1": 0, "y1": 5, "x2": 400, "y2": 5, "metres": 4}],
+            }
+        )
+
+        reading = photo_conversion.read_cotas(JPEG, "image/jpeg")
+
+        assert reading["dimensions"][0]["metres"] == 4
+        assert (reading["image_width"], reading["image_height"]) == (800, 600)
+        kwargs = client.beta.messages.create.call_args.kwargs
+        assert kwargs["model"] == "claude-opus-5-5"
+        assert kwargs["output_config"]["effort"] == "low"
+        schema = kwargs["output_config"]["format"]["schema"]
+        assert set(schema["required"]) == {"is_floor_plan", "dimensions"}
+        assert kwargs["fallbacks"] == "default"
+
+    def test_a_refusal_is_unavailable(self, client) -> None:
+        client.beta.messages.create.return_value = claude_reply({}, "refusal")
+
+        with pytest.raises(ConversionUnavailable):
+            photo_conversion.read_cotas(JPEG, "image/jpeg")
+
+    def test_an_api_error_is_unavailable(self, client) -> None:
+        client.beta.messages.create.side_effect = anthropic.APIConnectionError(
+            request=mocker_request()
+        )
+
+        with pytest.raises(ConversionUnavailable):
+            photo_conversion.read_cotas(JPEG, "image/jpeg")
+
+
+class TestMissingSides:
+    """Qué lado falta: una cota horizontal y una vertical legibles bastan."""
+
+    def test_a_slanted_cota_measures_neither_side(self) -> None:
+        reading = cotas_reading(100, 100, (0, 0, 60, 60, 8.5))
+
+        assert photo_conversion.missing_sides(reading) == ["width", "height"]
+
+    def test_both_sides_written(self) -> None:
+        reading = cotas_reading(100, 100, (0, 0, 90, 3, 9), (2, 0, 0, 80, 8))
+
+        assert photo_conversion.missing_sides(reading) == []
+
+
+class TestReadPlanWithMeasures:
+    """La IA recibe el ancho y el alto que dio el arquitecto."""
+
+    def test_the_measures_go_in_the_prompt(self, mocker, settings) -> None:
+        settings.ANTHROPIC_API_KEY = "test-key"
+        fake = mocker.Mock()
+        mocker.patch.object(photo_conversion.anthropic, "Anthropic", return_value=fake)
+        fake.beta.messages.create.return_value = claude_reply(plan_reading(800, 600))
+
+        photo_conversion.read_plan(
+            JPEG, "image/jpeg", measures={"width_m": 12.5, "height_m": 8.0}
+        )
+
+        text = fake.beta.messages.create.call_args.kwargs["messages"][0]["content"][1]
+        assert "12.5 m wide" in text["text"]
+        assert "8.0 m high" in text["text"]

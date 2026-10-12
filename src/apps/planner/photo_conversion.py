@@ -2,8 +2,13 @@
 
 Claude reads the photo and answers in pixels of the image it saw; the plan gets
 them back relative to the photo (0 to 1 on each side), because the editor lays
-them over the photo as its background and gives them a real scale later, from
-two points the architect marks (US-41). Nothing here knows metres.
+them over the photo as its background.
+
+Before that reading, the plan's measures are looked for (iteracion-7): a quick
+reading of only its cotas tells whether it has its width and its height
+written. When one is missing the architect is asked for it, and with them the
+reading comes back with its scale — metres per pixel of the polished photo —
+so the plan arrives in real metres.
 """
 
 import base64
@@ -29,6 +34,11 @@ SUPPORTED_FORMATS = {"PNG", "JPEG", "WEBP"}
 # El escenario «El servicio no responde» espera un minuto y se rinde.
 TIMEOUT_SECONDS = 60
 ROOM_NAME_MAX = 60
+# La lectura rápida sólo busca las cotas: poco esfuerzo y una respuesta corta.
+COTAS_EFFORT = "low"
+COTAS_MAX_TOKENS = 4000
+# Una cota más inclinada que esto no mide ni el ancho ni el alto del plano.
+SIDE_SLOPE = math.tan(math.radians(10))
 
 PROMPT = """\
 This is a floor plan on paper — printed, or sketched by hand — photographed and \
@@ -56,6 +66,21 @@ Use pixel coordinates of this image, x to the right and y downwards. Trace each 
 wall straight through its doors and windows: they go in openings, not as gaps.
 If the photo is not a floor plan, or it is too blurry to see the walls, set \
 is_floor_plan to false and leave every list empty."""
+
+MEASURES_HINT = """
+
+The architect says the whole plan measures {measures}, from outside to outside. \
+Use it to judge the proportions of the walls you trace."""
+
+COTAS_PROMPT = """\
+This is a floor plan on paper, photographed and cleaned up. The image is \
+{width} × {height} pixels.
+
+List only the dimensions written on the plan (its cotas) that you can read \
+clearly: for each, the two ends of its dimension line, in pixel coordinates of \
+this image (x to the right, y downwards), and the length it states in metres: \
+4.5 for «4.50», «4,50» or «450» in centimetres. Leave out any you cannot read \
+with certainty. If the photo is not a floor plan, set is_floor_plan to false."""
 
 POINT = {
     "type": "object",
@@ -130,6 +155,16 @@ READING_SCHEMA = {
 }
 
 
+COTA = READING_SCHEMA["properties"]["dimensions"]
+
+COTAS_SCHEMA = {
+    "type": "object",
+    "properties": {"is_floor_plan": {"type": "boolean"}, "dimensions": COTA},
+    "required": ["is_floor_plan", "dimensions"],
+    "additionalProperties": False,
+}
+
+
 class UnsupportedPhoto(Exception):
     """The file is not a PNG, JPG or WEBP image."""
 
@@ -168,8 +203,10 @@ def prepare_photo(data: bytes) -> tuple[bytes, str]:
     return buffer.getvalue(), "image/png"
 
 
-def read_plan(image: bytes, media_type: str) -> dict:
-    """Ask Claude for the walls and rooms of the photo, in pixels.
+def _ask_claude(
+    image: bytes, media_type: str, prompt: str, schema: dict, **options
+) -> dict:
+    """One look of Claude at the photo, answered in the JSON of ``schema``.
 
     The answer comes back with the image size it refers to, so turning it into
     relative coordinates never depends on a size guessed elsewhere.
@@ -187,11 +224,11 @@ def read_plan(image: bytes, media_type: str) -> dict:
     try:
         response = client.beta.messages.create(
             model=settings.PHOTO_PLAN_MODEL,
-            max_tokens=16000,
+            max_tokens=options.get("max_tokens", 16000),
             thinking={"type": "adaptive"},
             output_config={
-                "effort": "medium",
-                "format": {"type": "json_schema", "schema": READING_SCHEMA},
+                "effort": options.get("effort", "medium"),
+                "format": {"type": "json_schema", "schema": schema},
             },
             # Si un filtro de seguridad rechaza la foto, la API reintenta con
             # el modelo de respaldo dentro de la misma llamada.
@@ -211,7 +248,7 @@ def read_plan(image: bytes, media_type: str) -> dict:
                         },
                         {
                             "type": "text",
-                            "text": PROMPT.format(width=width, height=height),
+                            "text": prompt.format(width=width, height=height),
                         },
                     ],
                 }
@@ -233,6 +270,86 @@ def read_plan(image: bytes, media_type: str) -> dict:
     except json.JSONDecodeError as error:
         raise ConversionUnavailable from error
     return {**reading, "image_width": width, "image_height": height}
+
+
+def _measures_text(measures: dict) -> str:
+    """{"width_m": 12.5, "height_m": 8} → «12.5 m wide and 8.0 m high»."""
+    parts = []
+    if "width_m" in measures:
+        parts.append(f"{float(measures['width_m'])} m wide (its horizontal side)")
+    if "height_m" in measures:
+        parts.append(f"{float(measures['height_m'])} m high (its vertical side)")
+    return " and ".join(parts)
+
+
+def read_plan(image: bytes, media_type: str, measures: dict | None = None) -> dict:
+    """Ask Claude for the walls and rooms of the photo, in pixels.
+
+    With the measures the architect gave, Claude reads knowing the plan's real
+    size, to approximate the walls whose length is not written.
+    """
+    prompt = PROMPT
+    if measures:
+        # Las llaves del texto ya resueltas no deben volver a formatearse.
+        hint = MEASURES_HINT.format(measures=_measures_text(measures))
+        prompt += hint.replace("{", "{{").replace("}", "}}")
+    return _ask_claude(image, media_type, prompt, READING_SCHEMA)
+
+
+def read_cotas(image: bytes, media_type: str) -> dict:
+    """The quick reading: only the cotas written on the plan, in pixels."""
+    return _ask_claude(
+        image,
+        media_type,
+        COTAS_PROMPT,
+        COTAS_SCHEMA,
+        effort=COTAS_EFFORT,
+        max_tokens=COTAS_MAX_TOKENS,
+    )
+
+
+def missing_sides(reading: dict) -> list[str]:
+    """Which of the plan's sides has no legible cota: "width", "height", both.
+
+    A cota along the horizontal gives the width's scale, one along the vertical
+    the height's; a slanted one gives neither.
+    """
+    horizontal = vertical = False
+    for (x1, y1), (x2, y2), _metres in _cotas(reading):
+        dx, dy = abs(x2 - x1), abs(y2 - y1)
+        horizontal = horizontal or dy <= dx * SIDE_SLOPE
+        vertical = vertical or dx <= dy * SIDE_SLOPE
+    return [
+        side
+        for side, found in (("width", horizontal), ("height", vertical))
+        if not found
+    ]
+
+
+def scale_from_measures(reading: dict, measures: dict) -> float | None:
+    """Metres per pixel the architect's width and height give the walls read.
+
+    The width is the span of all the walls from left to right, the height from
+    top to bottom; with both, the two scales are averaged.
+    """
+    width = reading["image_width"]
+    height = reading["image_height"]
+    points = [
+        _inside_photo(wall[f"x{end}"], wall[f"y{end}"], width, height)
+        for wall in reading.get("walls", [])
+        for end in (1, 2)
+    ]
+    if not points:
+        return None
+    xs = [x for x, _ in points]
+    ys = [y for _, y in points]
+    spans = {"width_m": max(xs) - min(xs), "height_m": max(ys) - min(ys)}
+    scales = [
+        float(measures[side]) / spans[side]
+        for side in ("width_m", "height_m")
+        if side in measures and spans[side] > 0
+    ]
+    return round(statistics.mean(scales), 8) if scales else None
 
 
 def _relative(x: float, y: float, width: float, height: float) -> dict:
@@ -372,25 +489,66 @@ def conversions_today(owner) -> int:
     return PhotoConversion.objects.filter(owner=owner, created_at__gte=midnight).count()
 
 
-def convert_photo(*, owner, data: bytes) -> dict:
+def _image_payload(image: bytes, media_type: str) -> dict:
+    """The polished photo as the editor lays it under the plan."""
+    width, height = Image.open(io.BytesIO(image)).size
+    src = f"data:{media_type};base64,{base64.standard_b64encode(image).decode()}"
+    return {"src": src, "width": width, "height": height}
+
+
+def _remaining_today(owner) -> int:
+    return max(settings.PHOTO_PLAN_DAILY_LIMIT - conversions_today(owner), 0)
+
+
+def convert_photo(
+    *,
+    owner,
+    data: bytes,
+    measures: dict | None = None,
+    skip_measures: bool = False,
+) -> dict:
     """Read the photo and count it against today's cap.
 
-    Only what Claude actually read is counted: a failure costs nothing, so it
-    does not take a photo away from the architect.
+    Without measures the cotas are looked for first; if the width or the height
+    has none legible, the answer asks for it instead of reading the plan, and
+    that costs no photo of the day. Only what Claude actually read as a plan
+    is counted: a failure costs nothing either.
     """
     image, media_type = prepare_photo(data)
-    reading = read_plan(image, media_type)
-    plan = to_plan(reading)
+
+    cotas = None
+    if not measures and not skip_measures:
+        cotas = read_cotas(image, media_type)
+        missing = missing_sides(cotas) if cotas.get("is_floor_plan") else []
+        if missing:
+            return {
+                "needs_measures": True,
+                "missing": missing,
+                "image": _image_payload(image, media_type),
+                "remaining_today": _remaining_today(owner),
+            }
+
+    reading = read_plan(image, media_type, measures=measures or None)
+    metres_per_pixel, scale = None, None
+    if measures:
+        metres_per_pixel = scale_from_measures(reading, measures)
+        scale = "medidas" if metres_per_pixel else None
+    elif cotas is not None and reading.get("is_floor_plan"):
+        # Las cotas de la lectura completa mandan; si no trajo, las de la rápida.
+        source = reading if _cotas(reading) else cotas
+        if _cotas(source):
+            metres_per_pixel, scale = read_scale(source), "cotas"
+
+    plan = to_plan(reading, metres_per_pixel=metres_per_pixel)
     PhotoConversion.objects.create(
         owner=owner, walls=len(plan["walls"]), rooms=len(plan["rooms"])
     )
-    remaining = settings.PHOTO_PLAN_DAILY_LIMIT - conversions_today(owner)
     # La foto pulida vuelve para quedar de fondo: es la que leyó Claude, así
     # que los muros caen exactos sobre ella.
-    width, height = Image.open(io.BytesIO(image)).size
-    src = f"data:{media_type};base64,{base64.standard_b64encode(image).decode()}"
     return {
         **plan,
-        "image": {"src": src, "width": width, "height": height},
-        "remaining_today": max(remaining, 0),
+        "image": _image_payload(image, media_type),
+        "remaining_today": _remaining_today(owner),
+        "scale": scale,
+        "metres_per_pixel": metres_per_pixel,
     }
