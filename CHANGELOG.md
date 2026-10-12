@@ -3,6 +3,20 @@
 Todas las notas de cambios relevantes de la API. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es-ES/) y versionado semántico.
 
+## [Unreleased] — iteracion-7
+
+### Changed
+- **planner — US-129 Medidas antes de leer el plano:** tras limpiar la foto,
+  `POST /api/plans/photo-conversions/` busca primero sus cotas con una lectura
+  rápida (el mismo modelo, esfuerzo bajo). Si no hay al menos una horizontal y
+  una vertical legibles, responde `needs_measures: true` con los lados que faltan
+  (`missing`: `width`, `height`) y la foto pulida, sin leer el plano y sin
+  descontar una foto del tope diario. La foto vuelve a enviarse con `width_m` y/o
+  `height_m` (mayores que 0; si no, «La medida debe ser mayor que 0»), que la IA
+  recibe para aproximar los muros, o con `skip_measures` para leerla como antes.
+  La respuesta trae `scale` (`cotas`, `medidas` o `null`) y `metres_per_pixel`
+  de la foto pulida cuando la escala se conoce.
+
 ## [3.0.0] — 2026-10-09 · iteracion-5: importación de planos más fiel, edición más ágil y plano ↔ cotización
 
 ### Changed

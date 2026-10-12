@@ -54,7 +54,9 @@ class PlanViewSet(viewsets.ModelViewSet):
     def photo_conversions(self, request: Request) -> Response:
         """US-129: the walls and rooms of a photo of a paper plan.
 
-        They come back relative to the photo (0 to 1), to be laid over it.
+        They come back relative to the photo (0 to 1), to be laid over it, with
+        the scale when it is known. When the plan has not its width or its
+        height written, the answer asks for them instead (``needs_measures``).
         """
         serializer = PhotoInputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -68,7 +70,10 @@ class PlanViewSet(viewsets.ModelViewSet):
 
         try:
             result = photo_conversion.convert_photo(
-                owner=request.user, data=serializer.validated_data["photo"].read()
+                owner=request.user,
+                data=serializer.validated_data["photo"].read(),
+                measures=serializer.measures(),
+                skip_measures=serializer.validated_data["skip_measures"],
             )
         except photo_conversion.UnsupportedPhoto as error:
             raise serializers.ValidationError(

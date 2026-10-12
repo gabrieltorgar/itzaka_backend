@@ -76,6 +76,9 @@ class PlanSerializer(serializers.ModelSerializer):
         return value
 
 
+MEASURE_MUST_BE_POSITIVE = "La medida debe ser mayor que 0"
+
+
 class PhotoInputSerializer(serializers.Serializer):
     """The photo of a paper plan, already shrunk by the browser (US-129)."""
 
@@ -86,6 +89,37 @@ class PhotoInputSerializer(serializers.Serializer):
             "invalid": "Sube la foto del plano",
         }
     )
+
+    # Las medidas totales que da el arquitecto cuando el plano no las trae
+    # escritas (iteracion-7), y la decisión de seguir sin ellas.
+    width_m = serializers.FloatField(
+        required=False, error_messages={"invalid": MEASURE_MUST_BE_POSITIVE}
+    )
+    height_m = serializers.FloatField(
+        required=False, error_messages={"invalid": MEASURE_MUST_BE_POSITIVE}
+    )
+    skip_measures = serializers.BooleanField(required=False, default=False)
+
+    def validate_width_m(self, value: float) -> float:
+        return self._positive(value)
+
+    def validate_height_m(self, value: float) -> float:
+        return self._positive(value)
+
+    @staticmethod
+    def _positive(value: float) -> float:
+        if not value > 0:
+            raise serializers.ValidationError(MEASURE_MUST_BE_POSITIVE)
+        return value
+
+    def measures(self) -> dict | None:
+        """The sides the architect gave, in metres; None when none."""
+        given = {
+            side: self.validated_data[side]
+            for side in ("width_m", "height_m")
+            if side in self.validated_data
+        }
+        return given or None
 
     def validate_photo(self, value):
         if value.size > settings.PHOTO_PLAN_MAX_BYTES:
