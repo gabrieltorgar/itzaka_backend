@@ -3,7 +3,7 @@
 Todas las notas de cambios relevantes de la API. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es-ES/) y versionado semántico.
 
-## [Unreleased] — iteracion-9
+## [3.3.1] — 2026-10-14 · iteracion-9: configuración de despliegue en Vercel
 
 ### Changed
 - **despliegue — TEC Configuración de despliegue en Vercel:** sólo `main` y
