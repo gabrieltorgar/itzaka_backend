@@ -3,6 +3,18 @@
 Todas las notas de cambios relevantes de la API. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es-ES/) y versionado semántico.
 
+## [Unreleased] — iteracion-9
+
+### Changed
+- **despliegue — TEC Configuración de despliegue en Vercel:** sólo `main` y
+  `develop` crean un despliegue; las ramas de trabajo quedan cubiertas por el
+  quality gate de CI y ya no dejan un preview de ~300 MB cada una. La función
+  `wsgi.py` excluye con `excludeFiles` las pruebas, los fixtures, la
+  documentación y las cachés. El build instala sólo lo de ejecución
+  (`uv sync --frozen --no-dev`) y migra, sin el `collectstatic` que copiaba a
+  `/tmp` (WhiteNoise sirve los estáticos con sus finders). Nuevas pruebas en
+  `test_deploy_entrypoint.py` vigilan esa configuración.
+
 ## [3.2.0] — 2026-10-12 · iteracion-7: medidas antes de leer el plano y recorrido «Asignar materiales»
 
 ### Changed
