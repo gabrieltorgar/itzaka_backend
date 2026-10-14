@@ -15,6 +15,12 @@ Todas las notas de cambios relevantes de la API. El formato sigue
   `/tmp` (WhiteNoise sirve los estáticos con sus finders). Nuevas pruebas en
   `test_deploy_entrypoint.py` vigilan esa configuración.
 
+### Fixed
+- **despliegue — `excludeFiles` dentro del límite de Vercel:** el esquema de
+  `vercel.json` admite hasta 256 caracteres y el glob tenía 282, así que el
+  despliegue de develop terminó en ERROR antes de construir. Ahora usa patrones
+  `**/` equivalentes (210 caracteres), y una prueba vigila el límite.
+
 ## [3.2.0] — 2026-10-12 · iteracion-7: medidas antes de leer el plano y recorrido «Asignar materiales»
 
 ### Changed

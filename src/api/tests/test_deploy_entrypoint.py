@@ -219,3 +219,13 @@ def test_the_build_installs_only_the_runtime_and_migrates() -> None:
     assert build.startswith("uv sync --frozen --no-dev && ")
     assert "uv run --no-sync python src/manage.py migrate --noinput" in build
     assert "collectstatic" not in build
+
+
+def test_exclude_files_fits_vercel_schema() -> None:
+    """Bug iteracion-9 - Vercel rechaza un ``excludeFiles`` de más de 256 caracteres.
+
+    El esquema de ``vercel.json`` lo valida antes del build: el despliegue de
+    develop terminó en ERROR sin llegar a construir.
+    """
+    for settings in _vercel_config()["functions"].values():
+        assert len(settings["excludeFiles"]) <= 256
