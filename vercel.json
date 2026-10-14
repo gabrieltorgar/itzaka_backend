@@ -1,4 +1,16 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "uv sync && uv run python src/manage.py migrate && uv run python src/manage.py collectstatic --noinput"
+  "git": {
+    "deploymentEnabled": {
+      "**": false,
+      "main": true,
+      "develop": true
+    }
+  },
+  "buildCommand": "uv sync --frozen --no-dev && uv run --no-sync python src/manage.py migrate --noinput",
+  "functions": {
+    "wsgi.py": {
+      "excludeFiles": "{**/tests/**,**/test_*.py,**/*_test.py,**/conftest.py,**/fixtures/**,docs/**,reports/**,htmlcov/**,coverage.xml,.coverage,.pytest_cache/**,.ruff_cache/**,node_modules/**,.github/**,**/*.md,scripts/test_gate.py}"
+    }
+  }
 }
