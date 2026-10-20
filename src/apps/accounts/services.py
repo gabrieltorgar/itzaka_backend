@@ -322,7 +322,7 @@ def start_password_reset(*, email: str) -> None:
     endpoint en un detector de clientes—, así que sólo se anota.
     """
     user = find_user(email=email)
-    logger.info("Password reset requested", extra={"account_known": user is not None})
+    logger.info("Account recovery requested", extra={"account_known": user is not None})
     if user is not None:
         send_verification_code(user=user, purpose=OtpCode.Purpose.PASSWORD_RESET)
 
@@ -350,7 +350,7 @@ def reset_password(*, email: str, code: str, password: str) -> User:
     user.save(update_fields=["password", "is_email_verified", "updated_at"])
     # Quien no sabía su contraseña no debe dejar abierta la sesión de nadie más.
     end_all_sessions(user=user)
-    logger.info("Password reset", extra={"user_id": str(user.pk)})
+    logger.info("Account recovered", extra={"user_id": str(user.pk)})
     return user
 
 
@@ -462,7 +462,7 @@ def change_password(*, user: User, current_password: str, new_password: str) -> 
     user.save(update_fields=["password", "updated_at"])
     # Las otras sesiones se cierran; la vista abre una nueva para quien la cambió.
     end_all_sessions(user=user)
-    logger.info("Password changed", extra={"user_id": str(user.pk)})
+    logger.info("Sign-in credentials changed", extra={"user_id": str(user.pk)})
     return user
 
 

@@ -1,0 +1,32 @@
+# .github/workflows/security.yml — todos los repos de código (backend, frontend, mobile)
+# Check obligatorio en main y develop: "security" (criterios SRV-03 y CRD-03).
+#   - dependencias con vulnerabilidades altas o críticas: pip-audit (uv) y pnpm audit (prod)
+#   - secretos en el historial: gitleaks (imagen oficial, sin licencia de la acción)
+# Excepciones: archivo .security-exceptions (una por línea: <id> <revisar-antes-de YYYY-MM-DD> <motivo>).
+# Una excepción vencida hace fallar el check: se revisa, se renueva con motivo o se corrige.
+name: security
+on:
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    - cron: "17 13 * * 1"        # lunes: vulnerabilidades nuevas en dependencias que no cambiaron
+  workflow_dispatch:
+
+jobs:
+  security:
+    name: security
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: Secretos en el repositorio (gitleaks)
+        run: docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:latest detect --source /repo --redact --no-banner
+      - uses: astral-sh/setup-uv@v5
+        if: hashFiles('pyproject.toml') != ''
+      - uses: pnpm/action-setup@v4
+        if: hashFiles('pnpm-lock.yaml') != ''
+      - uses: actions/setup-node@v4
+        if: hashFiles('pnpm-lock.yaml') != ''
+        with: { node-version: 22, cache: pnpm }
+      - name: Dependencias vulnerables
+        run: python3 scripts/security_audit.py --min-severity high
