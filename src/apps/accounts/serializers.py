@@ -5,6 +5,7 @@ from rest_framework import serializers
 from apps.accounts.models import HEX_COLOR_VALIDATOR, Organization, Subscription, User
 from apps.legal.serializers import AcceptanceSerializer
 from apps.legal.services import check_versions, status_for
+from common.phones import PhoneField
 from common.validators import IMAGES, validate_upload
 
 MIN_PASSWORD_LENGTH = 8
@@ -220,9 +221,7 @@ class OrganizationSerializer(serializers.ModelSerializer):
         allow_blank=True,
         error_messages={"invalid": "Escribe un correo válido"},
     )
-    phone = serializers.CharField(
-        max_length=30, required=False, allow_blank=True, trim_whitespace=True
-    )
+    phone = PhoneField()
 
     # Sube un archivo y se lee como dirección: el documento no carga bytes,
     # carga una imagen que ya está en la cuenta.

@@ -4,7 +4,7 @@ import logging
 from decimal import Decimal
 
 from django.db import transaction
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import NotFound, ValidationError
 
 from apps.quotes.models import QuoteItem
 from apps.staff.models import Assignment, Worker, WorkerPayment, WorkerService
@@ -59,6 +59,32 @@ def labor_unit_price_for(*, quote_item: QuoteItem, worker: Worker) -> Decimal | 
 
 
 @transaction.atomic
+def ensure_single_self(*, owner, exclude=None) -> None:
+    """«Yo» es uno solo en el personal de una cuenta.
+
+    Raises:
+        ValidationError: la cuenta ya tiene su registro propio (otro que
+            ``exclude``, el que se está editando).
+    """
+    others = Worker.objects.filter(owner=owner, is_self=True)
+    if exclude is not None:
+        others = others.exclude(pk=exclude)
+    if others.exists():
+        raise ValidationError("Ya tienes un registro tuyo en el personal")
+
+
+def hand_out(*, owner, project, **share) -> Assignment:
+    """Repartir parte de una partida de un proyecto de la cuenta.
+
+    Raises:
+        NotFound: el proyecto es de otra cuenta.
+        ValidationError: lo que valide ``assign_service``.
+    """
+    if project.owner_id != owner.id:
+        raise NotFound("Proyecto no encontrado.")
+    return assign_service(project=project, **share)
+
+
 def assign_service(
     *,
     project,

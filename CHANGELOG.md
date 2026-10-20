@@ -3,6 +3,33 @@
 Todas las notas de cambios relevantes de la API. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es-ES/) y versionado semántico.
 
+## [3.6.0] — 2026-10-20 · iteracion-13: plataforma y convenciones (admin, teléfonos y capas)
+
+### Changed
+- **admin — TEC Django Unfold:** el panel de administración usa Unfold en
+  todos los modelos de la aplicación (se suman las partidas de cotización y los
+  servicios del personal), con el usuario por correo en formularios de Unfold y
+  los grupos registrados de nuevo. La CSP sólo se abre bajo `/admin/` para lo
+  que Unfold necesita (`'unsafe-eval'` de Alpine y estilos en línea); la API
+  conserva la estricta. Entrar al admin lleva a `/admin/`.
+- **clientes — US-07 Teléfonos validados:** el teléfono de clientes,
+  organización, personal y contactos se valida (`django-phonenumber-field`,
+  región MX) y se guarda en E.164; la API lo devuelve como se escribe en México
+  («55 1234 5678») o con su lada si es de fuera. Uno que no es teléfono se
+  rechaza con «Escribe un teléfono válido, con su lada.». La migración pasa a
+  E.164 los que ya estaban sin perder los que no se pueden leer.
+- **arquitectura — TEC Capas e higiene:** las consultas y reglas de personal
+  pasan de las vistas a `staff/selectors.py` y `staff/services.py`
+  (`get_owned_worker`, `ensure_single_self`, `hand_out`). Pruebas de
+  arquitectura: ninguna vista consulta modelos directamente y
+  `requirements.txt` es exactamente el `uv export` del `uv.lock`.
+
+### Fixed
+- **dependencias vulnerables:** Pillow 13.0 corrige ocho vulnerabilidades altas
+  publicadas después de la 3.5.0 que encontró el workflow `security`.
+
+---
+
 ## [3.5.0] — 2026-10-20 · iteracion-12: seguridad (sesión, límites, reCAPTCHA, archivos y línea base)
 
 ### Added

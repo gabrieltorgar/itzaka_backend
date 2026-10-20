@@ -9,6 +9,7 @@ from apps.staff.models import Assignment, Worker, WorkerPayment
 from apps.staff.selectors import worker_totals
 from common.fields import OwnedPrimaryKeyRelatedField
 from common.money import money
+from common.phones import PhoneField
 
 
 class WorkerServiceInputSerializer(serializers.Serializer):
@@ -32,6 +33,7 @@ class WorkerSerializer(serializers.ModelSerializer):
             "required": "El nombre es obligatorio",
         },
     )
+    phone = PhoneField()
     services = WorkerServiceInputSerializer(many=True, required=False)
     committed_value = serializers.SerializerMethodField()
     accrued_value = serializers.SerializerMethodField()

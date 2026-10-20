@@ -1,12 +1,13 @@
 """Admin registration for legal: las constancias se consultan, no se editan."""
 
 from django.contrib import admin
+from unfold.admin import ModelAdmin
 
 from apps.legal.models import LegalAcceptance
 
 
 @admin.register(LegalAcceptance)
-class LegalAcceptanceAdmin(admin.ModelAdmin):
+class LegalAcceptanceAdmin(ModelAdmin):
     list_display = ("user", "document", "version", "accepted_at", "ip_address")
     list_filter = ("document", "version")
     search_fields = ("user__email",)

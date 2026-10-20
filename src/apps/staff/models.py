@@ -16,6 +16,7 @@ from django.conf import settings
 from django.db import models
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
+from phonenumber_field.modelfields import PhoneNumberField
 
 from common.models import TimestampedModel
 
@@ -40,9 +41,7 @@ class Worker(TimestampedModel):
         verbose_name=_("tipo"),
     )
     name = models.CharField(max_length=150, verbose_name=_("nombre"))
-    phone = models.CharField(
-        max_length=30, blank=True, default="", verbose_name=_("teléfono")
-    )
+    phone = PhoneNumberField(blank=True, default="", verbose_name=_("teléfono"))
     email = models.EmailField(blank=True, default="", verbose_name=_("correo"))
     notes = models.TextField(blank=True, default="", verbose_name=_("notas"))
     is_self = models.BooleanField(

@@ -2,6 +2,7 @@
 
 from django.db import models
 from django.utils.translation import gettext_lazy as _
+from phonenumber_field.modelfields import PhoneNumberField
 
 from common.models import TimestampedModel
 
@@ -17,7 +18,7 @@ class Lead(TimestampedModel):
     """
 
     name = models.CharField(max_length=150, verbose_name=_("nombre"))
-    phone = models.CharField(max_length=30, blank=True, verbose_name=_("teléfono"))
+    phone = PhoneNumberField(blank=True, verbose_name=_("teléfono"))
     email = models.EmailField(blank=True, verbose_name=_("correo"))
     message = models.TextField(
         max_length=MESSAGE_MAX_LENGTH, blank=True, verbose_name=_("mensaje")

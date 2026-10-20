@@ -13,6 +13,7 @@ from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
 from django.core.validators import RegexValidator
 from django.db import models
 from django.utils.translation import gettext_lazy as _
+from phonenumber_field.modelfields import PhoneNumberField
 
 from apps.accounts.managers import UserManager
 from common.uploads import organization_logo_upload_to
@@ -163,8 +164,7 @@ class Organization(models.Model):
         verbose_name=_("correo de contacto"),
         help_text=_("Sale en los documentos; vacío no sale nada."),
     )
-    phone = models.CharField(
-        max_length=30,
+    phone = PhoneNumberField(
         blank=True,
         default="",
         verbose_name=_("teléfono de contacto"),
