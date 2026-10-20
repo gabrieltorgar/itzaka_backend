@@ -75,6 +75,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "rest_framework_simplejwt.token_blacklist",
     "corsheaders",
+    "csp",
     "django_filters",
     "storages",
     # Local apps
@@ -96,6 +97,8 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
+    # Content-Security-Policy del admin y la API navegable (settings_csp.py).
+    "csp.middleware.CSPMiddleware",
     # WhiteNoise serves static files (admin/DRF) from the serverless function;
     # must sit right after SecurityMiddleware.
     "whitenoise.middleware.WhiteNoiseMiddleware",
@@ -131,7 +134,14 @@ DATABASES = {"default": env.db("DATABASE_URL")}
 
 AUTH_USER_MODEL = "accounts.User"
 
+# Se aplican de verdad al registrarse, recuperar y cambiar la contraseña
+# (accounts.services.check_password_strength), no sólo en el admin.
 AUTH_PASSWORD_VALIDATORS = [
+    {
+        "NAME": (
+            "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"
+        )
+    },
     {
         "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
         "OPTIONS": {"min_length": 8},
@@ -156,6 +166,8 @@ REST_FRAMEWORK = {
     ),
     "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
     "DEFAULT_FILTER_BACKENDS": ("django_filters.rest_framework.DjangoFilterBackend",),
+    # Pagina sólo si se pide (page/page_size) y nunca más de 100 por página.
+    "DEFAULT_PAGINATION_CLASS": "common.pagination.OptionalPageNumberPagination",
     "TEST_REQUEST_DEFAULT_FORMAT": "json",
     # Límites por dirección o por cuenta en todo, y uno propio en cada puerta
     # pública: sin tope, un código de seis dígitos se adivina probando.
@@ -177,6 +189,12 @@ REST_FRAMEWORK = {
     # Detrás del proxy de Vercel, la dirección real es la del X-Forwarded-For.
     "NUM_PROXIES": env.int("NUM_PROXIES", default=1),
     "EXCEPTION_HANDLER": "common.exceptions.exception_handler",
+    # JSON y nada más en producción: la API navegable es una página más que
+    # cuidar (y que pone estilos en línea, que la CSP no deja pasar).
+    "DEFAULT_RENDERER_CLASSES": (
+        ("rest_framework.renderers.JSONRenderer",)
+        + (("rest_framework.renderers.BrowsableAPIRenderer",) if DEBUG else ())
+    ),
 }
 
 # --- Caché compartida (estado de los límites) ---
@@ -266,6 +284,11 @@ CORS_ALLOW_CREDENTIALS = True
 # aplicación tiene que ser de confianza para la comprobación CSRF de Django.
 CSRF_TRUSTED_ORIGINS = list(dict.fromkeys(CSRF_TRUSTED_ORIGINS + CORS_ALLOWED_ORIGINS))
 
+# Tope explícito del cuerpo de una petición que no es archivo. Vercel corta en
+# ~4.5 MB; el documento de un plano (PLAN_MAX_BYTES) es lo más grande que viaja.
+DATA_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024
+
 # STATIC/MEDIA + security + logging + storages (media on R2 in production)
 from .env import *  # noqa: E402,F403
+from .settings_csp import *  # noqa: E402,F403
 from .settings_storages import *  # noqa: E402,F403

@@ -53,6 +53,11 @@ SESSION_COOKIE_SAMESITE = "Lax"
 CSRF_COOKIE_HTTPONLY = False
 CSRF_COOKIE_SAMESITE = "Lax"
 
+# --- Cabeceras (siempre) ---
+# Explícito aunque sea el valor de Django: ninguna dirección de la API sale
+# completa hacia otro sitio.
+SECURE_REFERRER_POLICY = "same-origin"
+
 # --- Endurecimiento de seguridad para producción ---
 if not DEBUG:
     SECURE_SSL_REDIRECT = True

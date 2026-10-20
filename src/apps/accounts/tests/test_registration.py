@@ -20,7 +20,7 @@ class TestRegistration:
         self, api_client
     ) -> None:
         """Flujo principal - Registro crea cuenta, suscripción y membrete."""
-        payload = {"email": "ana@estudio.mx", "password": "secret123", **accepted()}
+        payload = {"email": "ana@estudio.mx", "password": "Teja-Roja-81", **accepted()}
 
         response = api_client.post(REGISTER_URL, payload)
 
@@ -30,7 +30,7 @@ class TestRegistration:
 
         user = User.objects.get(email="ana@estudio.mx")
         assert user.is_email_verified is False
-        assert user.check_password("secret123") is True
+        assert user.check_password("Teja-Roja-81") is True
 
         subscription = Subscription.objects.get(user=user)
         assert subscription.status == Subscription.Status.ACTIVE
@@ -39,7 +39,7 @@ class TestRegistration:
 
     def test_register_with_existing_email_returns_400(self, api_client, user) -> None:
         """Caso alternativo - Correo ya registrado."""
-        payload = {"email": user.email, "password": "secret123", **accepted()}
+        payload = {"email": user.email, "password": "Teja-Roja-81", **accepted()}
 
         response = api_client.post(REGISTER_URL, payload)
 
@@ -49,7 +49,7 @@ class TestRegistration:
 
     def test_register_with_an_invalid_email_returns_400(self, api_client) -> None:
         """Caso alternativo - Lo escrito no es un correo."""
-        payload = {"email": "5512345678", "password": "secret123", **accepted()}
+        payload = {"email": "5512345678", "password": "Teja-Roja-81", **accepted()}
 
         response = api_client.post(REGISTER_URL, payload)
 

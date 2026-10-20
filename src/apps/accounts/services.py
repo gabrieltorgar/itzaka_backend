@@ -7,7 +7,9 @@ import secrets
 from datetime import timedelta
 
 from django.conf import settings
+from django.contrib.auth import password_validation
 from django.contrib.auth.hashers import check_password, make_password
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from django.db.models import F
 from django.utils import timezone
@@ -166,6 +168,23 @@ def send_verification_code(
 
 
 @transaction.atomic
+def check_password_strength(
+    *, password: str, user: User, field: str = "password"
+) -> None:
+    """Los validadores de Django (AUTH_PASSWORD_VALIDATORS), en la API.
+
+    Antes sólo se pedía el largo: «password123» o una derivada del propio correo
+    pasaban. Se aplican al registrarse, al recuperar y al cambiar la contraseña.
+
+    Raises:
+        ValidationError: ``{field: [motivos]}``.
+    """
+    try:
+        password_validation.validate_password(password, user=user)
+    except DjangoValidationError as exc:
+        raise ValidationError({field: list(exc.messages)}) from None
+
+
 def register_user(
     *,
     email: str,
@@ -185,6 +204,7 @@ def register_user(
     email = normalize_email(email)
     if not email:
         raise ValidationError({"email": "Necesitas un correo para registrarte"})
+    check_password_strength(password=password, user=User(email=email))
 
     user = User.objects.create_user(email=email, password=password)
     Subscription.objects.create(
@@ -312,12 +332,14 @@ def reset_password(*, email: str, code: str, password: str) -> User:
 
     Raises:
         NotFound: no existe una cuenta con ese correo.
-        ValidationError: el código no es el correcto.
+        ValidationError: la contraseña es débil o el código no es el correcto.
     """
     user = find_user(email=email)
     if user is None:
         raise NotFound("No existe una cuenta con ese correo.")
 
+    # Antes de gastar el código: una contraseña débil no obliga a pedir otro.
+    check_password_strength(password=password, user=user)
     if not check_otp(user=user, purpose=OtpCode.Purpose.PASSWORD_RESET, code=code):
         raise ValidationError("Código de verificación inválido")
 
@@ -435,6 +457,7 @@ def change_password(*, user: User, current_password: str, new_password: str) -> 
         raise ValidationError(
             {"new_password": "La contraseña nueva debe ser distinta de la actual"}
         )
+    check_password_strength(password=new_password, user=user, field="new_password")
     user.set_password(new_password)
     user.save(update_fields=["password", "updated_at"])
     # Las otras sesiones se cierran; la vista abre una nueva para quien la cambió.

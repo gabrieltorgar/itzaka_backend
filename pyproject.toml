@@ -19,6 +19,7 @@ dependencies = [
     "opencv-python-headless>=4.10,<6",
     "numpy>=2,<3",
     "filetype>=1.2.0",
+    "django-csp>=4,<5",
 ]
 
 [dependency-groups]

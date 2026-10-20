@@ -206,7 +206,7 @@ class TestEliminarLaCuenta:
 
         response = api_client.post(
             "/api/auth/register/",
-            {"email": email, "password": "secret123", **accepted()},
+            {"email": email, "password": "Teja-Roja-81", **accepted()},
         )
 
         assert response.status_code == status.HTTP_201_CREATED

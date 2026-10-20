@@ -23,12 +23,15 @@ botocore==1.43.54
 django==5.2.16
     # via
     #   django-cors-headers
+    #   django-csp
     #   django-filter
     #   django-storages
     #   djangorestframework
     #   djangorestframework-simplejwt
     #   presuplano-backend
 django-cors-headers==4.9.0
+    # via presuplano-backend
+django-csp==4.0
     # via presuplano-backend
 django-environ==0.12.1
     # via presuplano-backend
@@ -70,6 +73,8 @@ numpy==2.5.3
     #   presuplano-backend
 opencv-python-headless==5.0.0.93
     # via presuplano-backend
+packaging==26.2
+    # via django-csp
 pillow==11.3.0
     # via presuplano-backend
 psycopg==3.3.4
