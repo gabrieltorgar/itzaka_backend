@@ -24,6 +24,10 @@ Todas las notas de cambios relevantes de la API. El formato sigue
   arquitectura: ninguna vista consulta modelos directamente y
   `requirements.txt` es exactamente el `uv export` del `uv.lock`.
 
+### Fixed
+- **dependencias vulnerables:** Pillow 13.0 corrige ocho vulnerabilidades altas
+  publicadas después de la 3.5.0 que encontró el workflow `security`.
+
 ---
 
 ## [3.5.0] — 2026-10-20 · iteracion-12: seguridad (sesión, límites, reCAPTCHA, archivos y línea base)
