@@ -56,6 +56,9 @@ Todas las notas de cambios relevantes de la API. El formato sigue
   de acceso cruzado para cada recurso.
 - **correo — dato personal en los registros:** el destinatario se registra
   enmascarado (`j***@dominio.com`).
+- **dependencias vulnerables:** pyjwt 2.15.1, sqlparse 0.6.0, Pillow 12.3,
+  Django 5.2.18, djangorestframework 3.17.2 y urllib3 2.8.0 corrigen
+  vulnerabilidades altas que encontró el workflow `security`.
 
 ## [3.3.1] — 2026-10-14 · iteracion-9: configuración de despliegue en Vercel
 
