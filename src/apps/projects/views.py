@@ -41,7 +41,9 @@ class ProjectViewSet(viewsets.ReadOnlyModelViewSet):
         return list_projects_for_owner(owner=self.request.user)
 
     def create(self, request: Request, *args, **kwargs) -> Response:
-        serializer = StartProjectSerializer(data=request.data)
+        serializer = StartProjectSerializer(
+            data=request.data, context={"request": request}
+        )
         serializer.is_valid(raise_exception=True)
         project = start_project(
             owner=request.user, quote=serializer.validated_data["quote"]
@@ -51,7 +53,9 @@ class ProjectViewSet(viewsets.ReadOnlyModelViewSet):
     @action(detail=True, methods=["post"])
     def progress(self, request: Request, pk: str | None = None) -> Response:
         project = self.get_object()
-        serializer = ProgressInputSerializer(data=request.data)
+        serializer = ProgressInputSerializer(
+            data=request.data, context={"request": request}
+        )
         serializer.is_valid(raise_exception=True)
         entry = register_progress(project=project, **serializer.validated_data)
         return Response(ProgressSerializer(entry).data, status=status.HTTP_201_CREATED)
@@ -83,7 +87,9 @@ class ProgressViewSet(viewsets.ReadOnlyModelViewSet):
 
     def partial_update(self, request: Request, pk: str | None = None) -> Response:
         progress = self.get_object()
-        serializer = ProgressUpdateSerializer(data=request.data, partial=True)
+        serializer = ProgressUpdateSerializer(
+            data=request.data, partial=True, context={"request": request}
+        )
         serializer.is_valid(raise_exception=True)
         progress = update_progress(progress=progress, **serializer.validated_data)
         return Response(ProgressSerializer(progress).data)

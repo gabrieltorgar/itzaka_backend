@@ -38,7 +38,9 @@ class PaymentViewSet(viewsets.ReadOnlyModelViewSet):
         return project
 
     def create(self, request: Request, *args, **kwargs) -> Response:
-        serializer = PaymentInputSerializer(data=request.data)
+        serializer = PaymentInputSerializer(
+            data=request.data, context={"request": request}
+        )
         serializer.is_valid(raise_exception=True)
         payment = register_payment(owner=request.user, **serializer.validated_data)
         return Response(PaymentSerializer(payment).data, status=status.HTTP_201_CREATED)

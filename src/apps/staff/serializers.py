@@ -7,13 +7,16 @@ from apps.projects.models import Project
 from apps.quotes.models import QuoteItem
 from apps.staff.models import Assignment, Worker, WorkerPayment
 from apps.staff.selectors import worker_totals
+from common.fields import OwnedPrimaryKeyRelatedField
 from common.money import money
 
 
 class WorkerServiceInputSerializer(serializers.Serializer):
     """Un servicio que hace esa persona, y a cómo se le paga."""
 
-    tariff = serializers.PrimaryKeyRelatedField(queryset=Tariff.objects.all())
+    tariff = OwnedPrimaryKeyRelatedField(
+        queryset=Tariff.objects.all(), not_found="Servicio no encontrado."
+    )
     unit_price = serializers.DecimalField(
         max_digits=12, decimal_places=2, required=False, allow_null=True
     )
@@ -103,9 +106,17 @@ class WorkerSerializer(serializers.ModelSerializer):
 class AssignmentInputSerializer(serializers.Serializer):
     """Validates a hand-out: which item, to whom, how much and at what price."""
 
-    project = serializers.PrimaryKeyRelatedField(queryset=Project.objects.all())
-    quote_item = serializers.PrimaryKeyRelatedField(queryset=QuoteItem.objects.all())
-    worker = serializers.PrimaryKeyRelatedField(queryset=Worker.objects.all())
+    project = OwnedPrimaryKeyRelatedField(
+        queryset=Project.objects.all(), not_found="Proyecto no encontrado."
+    )
+    quote_item = OwnedPrimaryKeyRelatedField(
+        queryset=QuoteItem.objects.all(),
+        owner_field="quote__owner",
+        not_found="Partida no encontrada.",
+    )
+    worker = OwnedPrimaryKeyRelatedField(
+        queryset=Worker.objects.all(), not_found="Personal no encontrado."
+    )
     quantity = serializers.DecimalField(max_digits=12, decimal_places=2)
     unit_price = serializers.DecimalField(
         max_digits=12, decimal_places=2, required=False, allow_null=True
@@ -142,9 +153,14 @@ class AssignmentSerializer(serializers.ModelSerializer):
 class WorkerPaymentInputSerializer(serializers.Serializer):
     """Validates a payment to a worker."""
 
-    worker = serializers.PrimaryKeyRelatedField(queryset=Worker.objects.all())
-    project = serializers.PrimaryKeyRelatedField(
-        queryset=Project.objects.all(), required=False, allow_null=True
+    worker = OwnedPrimaryKeyRelatedField(
+        queryset=Worker.objects.all(), not_found="Personal no encontrado."
+    )
+    project = OwnedPrimaryKeyRelatedField(
+        queryset=Project.objects.all(),
+        not_found="Proyecto no encontrado.",
+        required=False,
+        allow_null=True,
     )
     amount = serializers.DecimalField(max_digits=12, decimal_places=2)
     method = serializers.ChoiceField(

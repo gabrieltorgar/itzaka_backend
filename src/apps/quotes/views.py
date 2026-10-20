@@ -71,7 +71,7 @@ class QuoteViewSet(viewsets.ModelViewSet):
     def plan_sync(self, request: Request, pk=None) -> Response:
         """POST /quotes/{id}/plan-sync/ — la cotización al día con su plano."""
         quote = self.get_object()
-        serializer = PlanSyncSerializer(data=request.data)
+        serializer = PlanSyncSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         quote = sync_quote_with_plan(
             quote=quote,

@@ -13,6 +13,7 @@ from apps.quotes.models import (
     Quote,
     QuoteItem,
 )
+from common.fields import OwnedPrimaryKeyRelatedField
 
 
 class QuoteItemInputSerializer(serializers.Serializer):
@@ -24,10 +25,13 @@ class QuoteItemInputSerializer(serializers.Serializer):
     split does not always land on a whole cent.  Omitted, the catalogue price
     stands.
 
-    Tariff/client ownership is enforced in the service layer.
+    Only the writer's own tariffs and clients are found (the service checks
+    again).
     """
 
-    tariff = serializers.PrimaryKeyRelatedField(queryset=Tariff.objects.all())
+    tariff = OwnedPrimaryKeyRelatedField(
+        queryset=Tariff.objects.all(), not_found="Servicio no encontrado."
+    )
     quantity = serializers.DecimalField(
         max_digits=12,
         decimal_places=2,
@@ -60,11 +64,16 @@ class QuoteWriteSerializer(serializers.Serializer):
     them —an older one still open— leaves what the quote already had.
     """
 
-    client = serializers.PrimaryKeyRelatedField(queryset=Client.objects.all())
+    client = OwnedPrimaryKeyRelatedField(
+        queryset=Client.objects.all(), not_found="Cliente no encontrado."
+    )
     items = QuoteItemInputSerializer(many=True)
-    # El plano del que sale (US-95); la propiedad se revisa en el servicio.
-    plan = serializers.PrimaryKeyRelatedField(
-        queryset=Plan.objects.all(), required=False, allow_null=True
+    # El plano del que sale (US-95), de la cuenta de quien cotiza.
+    plan = OwnedPrimaryKeyRelatedField(
+        queryset=Plan.objects.all(),
+        not_found="Plano no encontrado.",
+        required=False,
+        allow_null=True,
     )
     notes = serializers.CharField(
         required=False,
@@ -98,7 +107,9 @@ class QuoteWriteSerializer(serializers.Serializer):
 class PlanSyncSerializer(serializers.Serializer):
     """What the plan measures now, to bring its quote up to date (US-95)."""
 
-    plan = serializers.PrimaryKeyRelatedField(queryset=Plan.objects.all())
+    plan = OwnedPrimaryKeyRelatedField(
+        queryset=Plan.objects.all(), not_found="Plano no encontrado."
+    )
     items = QuoteItemInputSerializer(many=True)
 
 
