@@ -24,7 +24,7 @@ class TestRegisterClient:
         self, authenticated_client, user
     ) -> None:
         """Flujo principal - Alta de cliente válido."""
-        payload = {"name": "Constructora Reyes", "phone": "555-1234"}
+        payload = {"name": "Constructora Reyes", "phone": "55 5555 1234"}
 
         response = authenticated_client.post(CLIENTS_URL, payload)
 
@@ -63,15 +63,18 @@ class TestUpdateClient:
 
     def test_update_phone_returns_200(self, authenticated_client, user) -> None:
         """Flujo principal - Actualizar datos del cliente."""
-        client = ClientFactory(owner=user, name="Constructora Reyes", phone="555-1234")
+        client = ClientFactory(
+            owner=user, name="Constructora Reyes", phone="+525555551234"
+        )
 
         response = authenticated_client.patch(
-            detail_url(client.id), {"phone": "555-9999"}
+            detail_url(client.id), {"phone": "55 9999 0000"}
         )
 
         assert response.status_code == status.HTTP_200_OK
         client.refresh_from_db()
-        assert client.phone == "555-9999"
+        # Se guarda en E.164 (iteracion-13).
+        assert str(client.phone) == "+525599990000"
 
     def test_update_with_empty_name_returns_400(
         self, authenticated_client, user

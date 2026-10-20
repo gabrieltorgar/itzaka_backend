@@ -81,6 +81,7 @@ INSTALLED_APPS = [
     "corsheaders",
     "csp",
     "django_filters",
+    "phonenumber_field",
     "storages",
     # Local apps
     "apps.accounts",
@@ -295,6 +296,11 @@ CSRF_TRUSTED_ORIGINS = list(dict.fromkeys(CSRF_TRUSTED_ORIGINS + CORS_ALLOWED_OR
 # Tope explícito del cuerpo de una petición que no es archivo. Vercel corta en
 # ~4.5 MB; el documento de un plano (PLAN_MAX_BYTES) es lo más grande que viaja.
 DATA_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024
+
+# --- Teléfonos (django-phonenumber-field, iteracion-13) ---
+# Se escriben como sea y se guardan en E.164; sin lada del país, son de México.
+PHONENUMBER_DEFAULT_REGION = "MX"
+PHONENUMBER_DB_FORMAT = "E164"
 
 # STATIC/MEDIA + security + logging + storages (media on R2 in production)
 from .env import *  # noqa: E402,F403

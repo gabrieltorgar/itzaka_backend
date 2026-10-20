@@ -15,4 +15,4 @@ class WorkerFactory(factory.django.DjangoModelFactory):
     owner = factory.SubFactory(UserFactory)
     name = factory.Sequence(lambda n: f"Trabajador {n}")
     kind = Worker.Kind.PERSON
-    phone = "555-9000"
+    phone = "+525555559000"

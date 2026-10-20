@@ -21,6 +21,7 @@ dependencies = [
     "filetype>=1.2.0",
     "django-csp>=4,<5",
     "django-unfold>=0.110,<0.111",
+    "django-phonenumber-field[phonenumbers]>=8,<9",
 ]
 
 [dependency-groups]

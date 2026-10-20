@@ -25,6 +25,7 @@ django==5.2.18
     #   django-cors-headers
     #   django-csp
     #   django-filter
+    #   django-phonenumber-field
     #   django-storages
     #   django-unfold
     #   djangorestframework
@@ -37,6 +38,8 @@ django-csp==4.0
 django-environ==0.12.1
     # via presuplano-backend
 django-filter==25.2
+    # via presuplano-backend
+django-phonenumber-field==8.5.0
     # via presuplano-backend
 django-storages==1.14.6
     # via presuplano-backend
@@ -78,6 +81,8 @@ opencv-python-headless==5.0.0.93
     # via presuplano-backend
 packaging==26.2
     # via django-csp
+phonenumbers==9.0.41
+    # via django-phonenumber-field
 pillow==12.3.0
     # via presuplano-backend
 psycopg==3.3.4

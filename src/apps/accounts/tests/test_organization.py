@@ -271,5 +271,6 @@ class TestContactoDeLaOrganizacion:
 
         response = authenticated_client.get(ME_URL)
 
-        assert response.data["organization"]["phone"] == "5512345678"
+        # Como se lee en México (iteracion-13: se guarda en E.164).
+        assert response.data["organization"]["phone"] == "55 1234 5678"
         assert "phone" not in {k for k in response.data if k != "organization"}

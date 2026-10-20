@@ -14,5 +14,5 @@ class ClientFactory(factory.django.DjangoModelFactory):
 
     owner = factory.SubFactory(UserFactory)
     name = factory.Sequence(lambda n: f"Cliente {n}")
-    phone = "555-1234"
+    phone = "+525555551234"
     email = ""

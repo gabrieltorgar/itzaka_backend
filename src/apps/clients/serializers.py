@@ -3,6 +3,7 @@
 from rest_framework import serializers
 
 from apps.clients.models import Client
+from common.phones import PhoneField
 
 
 class ClientSerializer(serializers.ModelSerializer):
@@ -20,6 +21,7 @@ class ClientSerializer(serializers.ModelSerializer):
         allow_blank=True,
         error_messages={"invalid": "El correo no tiene un formato válido"},
     )
+    phone = PhoneField()
     quotes_count = serializers.SerializerMethodField()
 
     class Meta:
