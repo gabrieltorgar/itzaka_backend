@@ -694,7 +694,7 @@ wheels = [
 
 [[package]]
 name = "presuplano-backend"
-version = "3.5.0"
+version = "3.6.0"
 source = { virtual = "." }
 dependencies = [
     { name = "anthropic" },
