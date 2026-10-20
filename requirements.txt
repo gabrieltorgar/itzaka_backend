@@ -44,6 +44,8 @@ djangorestframework-simplejwt==5.5.1
     # via presuplano-backend
 docstring-parser==0.18.0
     # via anthropic
+filetype==1.2.0
+    # via presuplano-backend
 h11==0.16.0 ; sys_platform != 'emscripten'
     # via httpcore2
 httpcore2==2.13.1 ; sys_platform != 'emscripten'

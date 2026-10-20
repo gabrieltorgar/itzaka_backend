@@ -8,10 +8,13 @@ from rest_framework.exceptions import ValidationError
 
 from apps.projects.models import Evidence, Progress, Project
 from apps.quotes.models import Quote, QuoteItem
+from common.validators import IMAGES, validate_upload
 
 logger = logging.getLogger("apps")
 
 MAX_IMAGE_BYTES = 5 * 1024 * 1024  # 5 MB
+# Una foto de 48 megapíxeles cabe; una bomba de descompresión, no.
+MAX_IMAGE_PIXELS = 50_000_000
 
 
 def start_project(*, owner, quote: Quote) -> Project:
@@ -200,11 +203,16 @@ def add_evidence(*, progress: Progress, image) -> Evidence:
             it exceeds the size limit.
     """
     _ensure_open(progress.project)
-    content_type = getattr(image, "content_type", "") or ""
-    if not content_type.startswith("image/"):
-        raise ValidationError("Solo se permiten archivos de imagen")
-    if image.size > MAX_IMAGE_BYTES:
-        raise ValidationError("La imagen supera el tamaño máximo permitido")
+    # Por su contenido, no por el tipo que dice el navegador (iteracion-12).
+    ext = validate_upload(
+        image,
+        allowed=IMAGES,
+        max_bytes=MAX_IMAGE_BYTES,
+        max_pixels=MAX_IMAGE_PIXELS,
+        too_big="La imagen supera el tamaño máximo permitido",
+        not_allowed="Solo se permiten archivos de imagen",
+    )
+    image.name = f"foto.{ext}"
     return Evidence.objects.create(progress=progress, image=image)
 
 
