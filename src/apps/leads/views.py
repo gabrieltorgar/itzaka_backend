@@ -9,6 +9,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.leads.serializers import LeadSerializer
+from apps.legal.services import client_ip
+from common.recaptcha import Verdict, guard_public_form
 
 logger = logging.getLogger("apps")
 
@@ -20,11 +22,23 @@ class ContactView(APIView):
     throttle_scope = "contact"
 
     def post(self, request: Request) -> Response:
-        serializer = LeadSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        lead = serializer.save()
-        logger.info("Contact lead received", extra={"lead_id": str(lead.pk)})
-        return Response(
+        # Si Google no contesta, el mensaje se queda —bajo el límite estricto de
+        # contacto— marcado para revisar: perder un cliente cuesta más.
+        verdict = guard_public_form(
+            request,
+            action="contact_submit",
+            when_unavailable="review",
+            remote_ip=client_ip(request),
+        )
+        received = Response(
             {"detail": "Gracias. Te contactamos pronto."},
             status=status.HTTP_201_CREATED,
         )
+        if verdict is Verdict.DROP:
+            return received
+
+        serializer = LeadSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        lead = serializer.save(needs_review=verdict is Verdict.REVIEW)
+        logger.info("Contact lead received", extra={"lead_id": str(lead.pk)})
+        return received

@@ -216,6 +216,16 @@ OTP_UNIVERSAL_CODE = env("OTP_UNIVERSAL_CODE")
 OTP_UNIVERSAL_CODE_ENABLED = env.bool("OTP_UNIVERSAL_CODE_ENABLED", default=DEBUG)
 OTP_MAX_ATTEMPTS = env("OTP_MAX_ATTEMPTS")
 
+# --- reCAPTCHA v3 en los formularios públicos (common/recaptcha.py) ---
+# Se verifica en cuanto hay llave secreta: sin ella no se cierra la puerta a
+# todos. La llave del sitio vive en el frontend (VITE_RECAPTCHA_SITE_KEY).
+RECAPTCHA_SECRET_KEY = env.str("RECAPTCHA_SECRET_KEY", default="").strip()
+RECAPTCHA_ENABLED = env.bool("RECAPTCHA_ENABLED", default=bool(RECAPTCHA_SECRET_KEY))
+RECAPTCHA_MIN_SCORE = env.float("RECAPTCHA_MIN_SCORE", default=0.5)
+RECAPTCHA_HOSTNAMES = env.list(
+    "RECAPTCHA_HOSTNAMES", default=["cuotreka.vercel.app", "localhost"]
+)
+
 # Tope de lo que puede viajar adjunto en un correo. Un PDF de cotización pesa
 # kilobytes; uno con fotos de avance, no tanto como para pagarlo en base64.
 DOCUMENT_EMAIL_MAX_BYTES = env.int("DOCUMENT_EMAIL_MAX_BYTES", default=8 * 1024 * 1024)

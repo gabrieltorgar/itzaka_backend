@@ -1,8 +1,10 @@
 """Accounts views (orchestration only; logic lives in services)."""
 
+import uuid
+
 from django.middleware.csrf import get_token
 from rest_framework import status
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import AuthenticationFailed, ValidationError
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.request import Request
@@ -34,6 +36,7 @@ from apps.accounts.services import (
     delete_account,
     get_my_organization,
     login_user,
+    normalize_email,
     organization_logo_data_url,
     register_user,
     request_email_change,
@@ -51,6 +54,7 @@ from common.auth_cookies import (
     set_session_cookies,
     set_token_cookies,
 )
+from common.recaptcha import Verdict, guard_public_form
 
 
 class RegisterView(APIView):
@@ -60,6 +64,23 @@ class RegisterView(APIView):
     throttle_scope = "signup"
 
     def post(self, request: Request) -> Response:
+        verdict = guard_public_form(
+            request,
+            action="signup_submit",
+            when_unavailable="reject",
+            remote_ip=client_ip(request),
+        )
+        if verdict is Verdict.DROP:
+            # La respuesta de un registro, sin cuenta detrás.
+            return Response(
+                {
+                    "id": str(uuid.uuid4()),
+                    "email": normalize_email(request.data.get("email")),
+                    "is_email_verified": False,
+                },
+                status=status.HTTP_201_CREATED,
+            )
+
         serializer = RegisterSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = register_user(
@@ -118,6 +139,15 @@ class LoginView(APIView):
     throttle_scope = "login"
 
     def post(self, request: Request) -> Response:
+        verdict = guard_public_form(
+            request,
+            action="login_submit",
+            when_unavailable="reject",
+            remote_ip=client_ip(request),
+        )
+        if verdict is Verdict.DROP:
+            raise AuthenticationFailed("Credenciales inválidas")
+
         serializer = LoginSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user, session = login_user(**serializer.validated_data)
@@ -191,9 +221,16 @@ class PasswordResetRequestView(APIView):
     throttle_scope = "password_reset"
 
     def post(self, request: Request) -> Response:
+        verdict = guard_public_form(
+            request,
+            action="password_reset_request",
+            when_unavailable="reject",
+            remote_ip=client_ip(request),
+        )
         serializer = PasswordResetRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        start_password_reset(**serializer.validated_data)
+        if verdict is not Verdict.DROP:
+            start_password_reset(**serializer.validated_data)
         # La misma respuesta exista o no la cuenta: no se revela quién es cliente.
         return Response(
             {
