@@ -25,8 +25,10 @@ class TestLogin:
         response = api_client.post(LOGIN_URL, payload)
 
         assert response.status_code == status.HTTP_200_OK
-        assert response.data["access"]
-        assert response.data["refresh"]
+        # La sesión va en cookies HttpOnly, nunca en el cuerpo (iteracion-12).
+        assert response.cookies["cuotreka_access"].value
+        assert response.cookies["cuotreka_refresh"].value
+        assert "access" not in response.data
         assert response.data["user"]["email"] == account.email
 
     def test_login_with_wrong_password_returns_401(

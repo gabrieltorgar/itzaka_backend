@@ -209,6 +209,10 @@ class OtpCode(models.Model):
     code_hash = models.CharField(max_length=128, verbose_name=_("código"))
     expires_at = models.DateTimeField(verbose_name=_("vence en"))
     used_at = models.DateTimeField(null=True, blank=True, verbose_name=_("usado en"))
+    # Intentos fallidos: al llegar a OTP_MAX_ATTEMPTS el código muere.
+    attempts = models.PositiveSmallIntegerField(
+        default=0, verbose_name=_("intentos fallidos")
+    )
     created_at = models.DateTimeField(auto_now_add=True, verbose_name=_("creado en"))
 
     class Meta:

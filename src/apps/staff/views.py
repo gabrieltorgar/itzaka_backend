@@ -71,7 +71,9 @@ class AssignmentViewSet(viewsets.ModelViewSet):
         )
 
     def _hand_out(self, request: Request, payload: dict):
-        serializer = AssignmentInputSerializer(data=payload)
+        serializer = AssignmentInputSerializer(
+            data=payload, context={"request": request}
+        )
         serializer.is_valid(raise_exception=True)
         data = dict(serializer.validated_data)
         if data["project"].owner_id != request.user.id:
@@ -113,7 +115,9 @@ class WorkerPaymentViewSet(viewsets.ReadOnlyModelViewSet):
         )
 
     def create(self, request: Request, *args, **kwargs) -> Response:
-        serializer = WorkerPaymentInputSerializer(data=request.data)
+        serializer = WorkerPaymentInputSerializer(
+            data=request.data, context={"request": request}
+        )
         serializer.is_valid(raise_exception=True)
         payment = pay_worker(owner=request.user, **serializer.validated_data)
         return Response(

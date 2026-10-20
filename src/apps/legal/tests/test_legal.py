@@ -113,7 +113,7 @@ class TestAceptarAlRegistrarse:
         """Flujo principal - La constancia lleva versión, IP y navegador."""
         response = api_client.post(
             REGISTER,
-            {"email": "ana@estudio.mx", "password": "secret123", **accepted()},
+            {"email": "ana@estudio.mx", "password": "Teja-Roja-81", **accepted()},
             HTTP_USER_AGENT="Navegador de prueba",
             HTTP_X_FORWARDED_FOR="203.0.113.7, 10.0.0.1",
         )
@@ -129,7 +129,7 @@ class TestAceptarAlRegistrarse:
     def test_without_accepting_there_is_no_account(self, api_client) -> None:
         """Caso alternativo - Sin aceptar no se crea la cuenta."""
         response = api_client.post(
-            REGISTER, {"email": "ana@estudio.mx", "password": "secret123"}
+            REGISTER, {"email": "ana@estudio.mx", "password": "Teja-Roja-81"}
         )
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
@@ -147,7 +147,7 @@ class TestAceptarAlRegistrarse:
             REGISTER,
             {
                 "email": "ana@estudio.mx",
-                "password": "secret123",
+                "password": "Teja-Roja-81",
                 "terms_version": "2000-01-01",
                 "privacy_version": accepted()["privacy_version"],
             },

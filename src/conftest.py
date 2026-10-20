@@ -1,9 +1,21 @@
 """Root pytest fixtures shared across apps."""
 
 import pytest
+from django.core.cache import cache
 from rest_framework.test import APIClient
 
 from apps.accounts.tests.factories import UserFactory
+
+
+@pytest.fixture(autouse=True)
+def _local_cache(settings):
+    """Caché en memoria y vacía en cada prueba: los límites no se arrastran."""
+    settings.CACHES = {
+        "default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}
+    }
+    cache.clear()
+    yield
+    cache.clear()
 
 
 @pytest.fixture

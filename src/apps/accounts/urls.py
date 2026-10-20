@@ -1,10 +1,10 @@
 """Accounts (auth) URLs. Endpoints are added per user story via TDD."""
 
 from django.urls import path
-from rest_framework_simplejwt.views import TokenRefreshView
 
 from apps.accounts.views import (
     LoginView,
+    LogoutView,
     MyAccountDeleteView,
     MyAccountView,
     MyEmailResendView,
@@ -17,6 +17,7 @@ from apps.accounts.views import (
     PasswordResetRequestView,
     RegisterView,
     ResendOtpView,
+    SessionRefreshView,
     VerifyOtpView,
 )
 
@@ -49,6 +50,7 @@ urlpatterns = [
         MyOrganizationLogoView.as_view(),
         name="organization-logo",
     ),
-    # Exchange a valid refresh token for a fresh access token (silent renew).
-    path("refresh/", TokenRefreshView.as_view(), name="refresh"),
+    # La sesión vive en cookies HttpOnly: renovarla (rota el refresh) y cerrarla.
+    path("refresh/", SessionRefreshView.as_view(), name="refresh"),
+    path("logout/", LogoutView.as_view(), name="logout"),
 ]

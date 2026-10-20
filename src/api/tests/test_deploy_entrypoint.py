@@ -221,6 +221,17 @@ def test_the_build_installs_only_the_runtime_and_migrates() -> None:
     assert "collectstatic" not in build
 
 
+def test_the_build_creates_the_shared_cache_table() -> None:
+    """Bug iteracion-12 - Los límites de intentos cuentan en la caché de la base.
+
+    ``createcachetable`` no es una migración: sin este paso la tabla no existe y
+    cada petición limitada fallaría al leer su contador.
+    """
+    build = _vercel_config()["buildCommand"]
+
+    assert build.endswith("uv run --no-sync python src/manage.py createcachetable")
+
+
 def test_exclude_files_fits_vercel_schema() -> None:
     """Bug iteracion-9 - Vercel rechaza un ``excludeFiles`` de más de 256 caracteres.
 

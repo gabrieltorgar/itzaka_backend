@@ -8,6 +8,7 @@ y el envío por Resend.
 """
 
 import logging
+import re
 from decimal import Decimal, InvalidOperation
 
 from django.conf import settings
@@ -16,6 +17,7 @@ from rest_framework.exceptions import ValidationError
 from common import mail
 from common.branding import brand_for
 from common.emails import render_email
+from common.validators import PDF, validate_upload
 
 logger = logging.getLogger("apps")
 
@@ -34,6 +36,21 @@ class Kind:
         (PAYMENT_VOUCHER, "Comprobante de pago"),
         (COLLECTION_VOUCHER, "Comprobante de cobro"),
     ]
+
+
+#: Cómo se llama el adjunto: lo pone el servidor, no quien sube el archivo.
+FILE_PREFIX = {
+    Kind.QUOTE: "cotizacion",
+    Kind.PROJECT_STATUS: "estatus-de-proyecto",
+    Kind.PAYMENT_VOUCHER: "comprobante-de-pago",
+    Kind.COLLECTION_VOUCHER: "comprobante-de-cobro",
+}
+
+
+def attachment_name(kind: str, reference: str = "") -> str:
+    """``cotizacion-COT-0007.pdf``: el tipo y, si la hay, la referencia."""
+    clean = re.sub(r"[^A-Za-z0-9_-]+", "-", reference).strip("-")[:40]
+    return f"{FILE_PREFIX[kind]}{'-' + clean if clean else ''}.pdf"
 
 
 #: Qué dice cada correo: el asunto, el título y la primera línea.
@@ -111,7 +128,8 @@ def send_document(
     """Manda el documento adjunto al correo indicado. Devuelve si salió.
 
     Raises:
-        ValidationError: el adjunto pesa de más, o no hay a quién mandarlo.
+        ValidationError: el adjunto pesa de más, no es un PDF o no hay a quién
+            mandarlo.
     """
     if not mail.is_configured():
         raise ValidationError(
@@ -119,12 +137,19 @@ def send_document(
             "Descarga el documento y compártelo como lo haces hoy."
         )
 
+    # Sólo el PDF que genera la aplicación sale con su marca: cualquier otro
+    # archivo convertiría el envío en un relevo de malware (iteracion-12).
     limit = settings.DOCUMENT_EMAIL_MAX_BYTES
-    if file.size > limit:
-        raise ValidationError(
+    validate_upload(
+        file,
+        allowed=PDF,
+        max_bytes=limit,
+        too_big=(
             f"El documento pesa más de {limit // (1024 * 1024)} MB y no se puede "
             "enviar por correo."
-        )
+        ),
+        not_allowed="Sólo se envían documentos PDF.",
+    )
 
     wording = WORDING[kind]
     brand = brand_for(user=user)
@@ -143,7 +168,9 @@ def send_document(
         html=html,
         reply_to=user.email or None,
         attachments=[
-            mail.Attachment(filename=file.name or "documento.pdf", content=file.read())
+            mail.Attachment(
+                filename=attachment_name(kind, reference), content=file.read()
+            )
         ],
     )
     logger.info(

@@ -23,6 +23,8 @@ class Lead(TimestampedModel):
         max_length=MESSAGE_MAX_LENGTH, blank=True, verbose_name=_("mensaje")
     )
     handled = models.BooleanField(default=False, verbose_name=_("atendido"))
+    # Llegó sin que Google pudiera verificarlo: puede ser un bot (iteracion-12).
+    needs_review = models.BooleanField(default=False, verbose_name=_("por revisar"))
 
     class Meta:
         db_table = "leads_lead"

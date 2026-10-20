@@ -1,0 +1,14 @@
+# .github/dependabot.yml — criterio SRV-03. Abre PRs semanales contra develop; nunca se fusionan sin quality gate.
+version: 2
+updates:
+  - package-ecosystem: "uv"            # pyproject.toml + uv.lock
+    directory: "/"
+    target-branch: "develop"
+    schedule: { interval: "weekly", day: "monday" }
+    open-pull-requests-limit: 5
+    groups:
+      menores: { update-types: ["minor", "patch"] }
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    target-branch: "develop"
+    schedule: { interval: "monthly" }

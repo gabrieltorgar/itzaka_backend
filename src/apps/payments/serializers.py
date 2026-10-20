@@ -5,14 +5,21 @@ from rest_framework import serializers
 from apps.payments.models import Payment
 from apps.projects.models import Project
 from apps.quotes.models import QuoteItem
+from common.fields import OwnedPrimaryKeyRelatedField
 
 
 class PaymentInputSerializer(serializers.Serializer):
     """Validates a payment payload."""
 
-    project = serializers.PrimaryKeyRelatedField(queryset=Project.objects.all())
-    quote_item = serializers.PrimaryKeyRelatedField(
-        queryset=QuoteItem.objects.all(), required=False, allow_null=True
+    project = OwnedPrimaryKeyRelatedField(
+        queryset=Project.objects.all(), not_found="Proyecto no encontrado."
+    )
+    quote_item = OwnedPrimaryKeyRelatedField(
+        queryset=QuoteItem.objects.all(),
+        owner_field="quote__owner",
+        not_found="Partida no encontrada.",
+        required=False,
+        allow_null=True,
     )
     amount = serializers.DecimalField(max_digits=12, decimal_places=2)
     method = serializers.ChoiceField(

@@ -5,6 +5,7 @@ from rest_framework import serializers
 from apps.accounts.models import HEX_COLOR_VALIDATOR, Organization, Subscription, User
 from apps.legal.serializers import AcceptanceSerializer
 from apps.legal.services import check_versions, status_for
+from common.validators import IMAGES, validate_upload
 
 MIN_PASSWORD_LENGTH = 8
 
@@ -195,6 +196,7 @@ class SubscriptionSerializer(serializers.ModelSerializer):
 
 #: Lo que puede pesar un logotipo. Es una marca, no una fotografía.
 LOGO_MAX_BYTES = 2 * 1024 * 1024
+LOGO_MAX_PIXELS = 25_000_000
 
 
 class OrganizationSerializer(serializers.ModelSerializer):
@@ -235,10 +237,15 @@ class OrganizationSerializer(serializers.ModelSerializer):
         """Un logotipo es una imagen, y no una de varios megas."""
         if value in (None, ""):
             return None
-        if value.size > LOGO_MAX_BYTES:
-            raise serializers.ValidationError(
-                f"El logotipo pesa más de {LOGO_MAX_BYTES // (1024 * 1024)} MB"
-            )
+        ext = validate_upload(
+            value,
+            allowed=IMAGES,
+            max_bytes=LOGO_MAX_BYTES,
+            max_pixels=LOGO_MAX_PIXELS,
+            too_big=f"El logotipo pesa más de {LOGO_MAX_BYTES // (1024 * 1024)} MB",
+            not_allowed="El logotipo tiene que ser una imagen PNG, JPG, WebP o GIF",
+        )
+        value.name = f"logo.{ext}"
         return value
 
     def to_representation(self, instance: Organization) -> dict:

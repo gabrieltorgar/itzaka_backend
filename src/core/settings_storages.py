@@ -38,6 +38,13 @@ _r2_configured = bool(
 )
 USE_R2 = env.bool("USE_R2", default=_r2_configured)
 
+# Bucket privado (iteracion-12): direcciones firmadas que vencen, servidas desde
+# el endpoint S3 de R2 —un dominio público no firma—. Apagado mientras el bucket
+# siga público y su CORS no cubra el endpoint S3 (el editor 3D lee texturas y
+# mallas con fetch); encenderlo es parte de cerrar el bucket.
+R2_SIGNED_URLS = env.bool("R2_SIGNED_URLS", default=False)
+R2_SIGNED_URL_SECONDS = env.int("R2_SIGNED_URL_SECONDS", default=3600)
+
 # Default (media) storage is local unless R2 is enabled below. Static files keep
 # Django's storage; WhiteNoise serves them via finders.
 STORAGES = {
@@ -73,3 +80,9 @@ if USE_R2:
             "custom_domain": _custom_domain,
         },
     }
+    if R2_SIGNED_URLS:
+        STORAGES["default"]["OPTIONS"].update(
+            querystring_auth=True,
+            querystring_expire=R2_SIGNED_URL_SECONDS,
+            custom_domain=None,
+        )
