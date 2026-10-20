@@ -3,6 +3,60 @@
 Todas las notas de cambios relevantes de la API. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es-ES/) y versionado semántico.
 
+## [3.5.0] — 2026-10-20 · iteracion-12: seguridad (sesión, límites, reCAPTCHA, archivos y línea base)
+
+### Added
+- **seguridad — TEC Línea base de seguridad en pruebas y CI:**
+  `src/tests/platform/test_security_baseline.py` vigila permisos y límites por
+  defecto, caché compartida, tope de página, validadores de contraseña, cookies,
+  cabeceras y el bloque HTTPS de producción, y revisa el código (campos
+  explícitos, SQL con parámetros, ninguna credencial en los registros). Workflow
+  `security` (gitleaks y pip-audit, con excepciones que vencen), Dependabot
+  semanal contra `develop` y un solo umbral de cobertura (90 %).
+
+### Changed
+- **accounts — US-03 Sesión en cookies seguras:** el inicio de sesión deja el
+  access (≤ 30 min) y el refresh (≤ 7 días) en cookies HttpOnly SameSite=Lax,
+  Secure en producción; el cuerpo sólo trae la cuenta. El refresh rota en cada
+  renovación (`POST /api/auth/refresh/`) y el usado queda en la lista negra;
+  `POST /api/auth/logout/` lo anula y borra las cookies; cambiar o restablecer la
+  contraseña cierra las demás sesiones. Las escrituras con la cookie exigen el
+  token CSRF (`X-CSRFToken`). La cabecera `Authorization` sigue sirviendo.
+- **API — límites de intentos (US-02):** throttling en toda la API (60/min por
+  dirección, 300/min por cuenta) y por puerta: acceso 10/min, registro 10/h,
+  códigos 5/min, recuperación 5/h, contacto 5/h, envío de documentos 30/h. Los
+  contadores viven en la caché de la base (el build corre `createcachetable`) y
+  el 429 dice «Demasiados intentos. Intenta de nuevo en N segundos.».
+- **formularios públicos — US-83 reCAPTCHA y campo trampa:** registro, acceso,
+  recuperación y contacto verifican un token de reCAPTCHA v3 por acción
+  (`recaptcha_token`) antes de validar nada, en cuanto hay
+  `RECAPTCHA_SECRET_KEY`; si Google no contesta, las puertas de la cuenta
+  responden 503 y el contacto se guarda «por revisar» (`Lead.needs_review`). Un
+  campo `website` lleno recibe la respuesta de siempre sin ningún efecto.
+- **archivos — US-16 validados por su contenido:** evidencia, logotipo,
+  texturas, piezas de mobiliario y documentos se juzgan por sus primeros bytes
+  (filetype) y se guardan como `<uuid>.<ext>`; por correo sólo sale un PDF, con
+  el nombre que pone el servidor. `R2_SIGNED_URLS` sirve el bucket privado con
+  direcciones firmadas que vencen (apagado hasta cerrar el bucket).
+- **seguridad — TEC Configuración de Django:** CSP estricta (django-csp),
+  Referrer-Policy explícita, sólo JSON en producción, paginación opcional con
+  tope de 100 por página (`page`, `page_size`) y tope del cuerpo de 5 MB.
+
+### Fixed
+- **accounts — contraseñas débiles:** los cuatro validadores de Django (con el
+  de parecido al correo) se aplican al registrarse, recuperar y cambiar la
+  contraseña; antes sólo se revisaba el largo.
+- **accounts — código de verificación adivinable:** cada código muere al quinto
+  intento fallido, y el código universal del MVP sólo abre cuentas sin correo
+  configurado y donde se pidió (`OTP_UNIVERSAL_CODE_ENABLED`, encendido con
+  `DEBUG`): en producción falla cerrado.
+- **US-18 referencias de otra cuenta:** un id ajeno en una escritura se rechaza
+  con el mismo mensaje que uno que no existe (`OwnedPrimaryKeyRelatedField`), y
+  ya no queda un trabajador creado a medias cuando su servicio era ajeno. Pruebas
+  de acceso cruzado para cada recurso.
+- **correo — dato personal en los registros:** el destinatario se registra
+  enmascarado (`j***@dominio.com`).
+
 ## [3.3.1] — 2026-10-14 · iteracion-9: configuración de despliegue en Vercel
 
 ### Changed
@@ -125,7 +179,6 @@ Todas las notas de cambios relevantes de la API. El formato sigue
 ### Notes
 - Desde esta entrega la API comparte la **versión del producto** con la
   interfaz (antes llevaba su propia numeración; la última fue 1.19.0).
-
 
 ### Removed
 - **docs — La documentación pasa a la memoria del proyecto:** `DEPLOY.md` se
