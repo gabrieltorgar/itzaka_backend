@@ -88,6 +88,16 @@ class TestPoliticaDeContenido:
         assert "object-src 'none'" in csp
         assert "unsafe-inline" not in csp.split("script-src", 1)[-1].split(";")[0]
 
+    @pytest.mark.django_db
+    def test_only_the_admin_gets_what_unfold_needs(self, client) -> None:
+        """Iteracion-13: Unfold usa Alpine (eval) y estilos en línea, sólo ahí."""
+        admin = client.get("/admin/login/")["Content-Security-Policy"]
+        api = client.get("/api/health/")["Content-Security-Policy"]
+
+        assert "'unsafe-eval'" in admin
+        assert "frame-ancestors 'none'" in admin
+        assert "unsafe" not in api
+
     def test_production_serves_json_only(self) -> None:
         """Caso de borde - Sin API navegable no hay HTML que proteger en la API."""
         entorno = {k: v for k, v in os.environ.items() if k != "DEBUG"}

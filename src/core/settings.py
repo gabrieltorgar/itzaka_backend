@@ -65,6 +65,10 @@ if _VERCEL_HOSTS:
     )
 
 INSTALLED_APPS = [
+    # Unfold antes del admin de Django, o sus plantillas nunca cargan.
+    "unfold",
+    "unfold.contrib.filters",
+    "unfold.contrib.forms",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -97,11 +101,12 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
-    # Content-Security-Policy del admin y la API navegable (settings_csp.py).
-    "csp.middleware.CSPMiddleware",
     # WhiteNoise serves static files (admin/DRF) from the serverless function;
     # must sit right after SecurityMiddleware.
     "whitenoise.middleware.WhiteNoiseMiddleware",
+    # Content-Security-Policy (settings_csp.py), con lo que Unfold necesita
+    # sólo bajo /admin/ (common/csp.py).
+    "common.csp.ScopedCSPMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -133,6 +138,9 @@ WSGI_APPLICATION = "core.wsgi.application"
 DATABASES = {"default": env.db("DATABASE_URL")}
 
 AUTH_USER_MODEL = "accounts.User"
+# La única pantalla con sesión de Django es el admin, y el login de Unfold no
+# manda «next»: sin esto, entrar llevaba a /accounts/profile/ (404).
+LOGIN_REDIRECT_URL = "admin:index"
 
 # Se aplican de verdad al registrarse, recuperar y cambiar la contraseña
 # (accounts.services.check_password_strength), no sólo en el admin.
@@ -292,3 +300,4 @@ DATA_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024
 from .env import *  # noqa: E402,F403
 from .settings_csp import *  # noqa: E402,F403
 from .settings_storages import *  # noqa: E402,F403
+from .settings_unfold import *  # noqa: E402,F403

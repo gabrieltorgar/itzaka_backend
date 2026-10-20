@@ -1,12 +1,13 @@
 """Planner admin: plans are read here, never edited by hand."""
 
 from django.contrib import admin
+from unfold.admin import ModelAdmin
 
 from apps.planner.models import PhotoConversion, Plan
 
 
 @admin.register(Plan)
-class PlanAdmin(admin.ModelAdmin):
+class PlanAdmin(ModelAdmin):
     list_display = ["name", "owner", "updated_at"]
     search_fields = ["name", "owner__email"]
     list_filter = ["updated_at"]
@@ -14,7 +15,7 @@ class PlanAdmin(admin.ModelAdmin):
 
 
 @admin.register(PhotoConversion)
-class PhotoConversionAdmin(admin.ModelAdmin):
+class PhotoConversionAdmin(ModelAdmin):
     """Who converted photos and when: the daily cap, seen from here."""
 
     list_display = ["owner", "walls", "rooms", "created_at"]
