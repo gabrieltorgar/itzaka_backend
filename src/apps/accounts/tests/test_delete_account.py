@@ -187,10 +187,10 @@ class TestEliminarLaCuenta:
     def test_the_session_dies_with_the_account(self, api_client, user_factory) -> None:
         """Caso de borde - La sesión de una cuenta borrada ya no abre nada."""
         user_factory(email="ana@estudio.mx", password="testpass123")
-        login = api_client.post(
+        # La sesión queda en las cookies del cliente, como en el navegador.
+        api_client.post(
             "/api/auth/login/", {"email": "ana@estudio.mx", "password": "testpass123"}
         )
-        api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {login.data['access']}")
 
         assert api_client.post(DELETE, {"password": "testpass123"}).status_code == 204
         assert (

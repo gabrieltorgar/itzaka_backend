@@ -16,6 +16,10 @@ from rest_framework.exceptions import (
     PermissionDenied,
     ValidationError,
 )
+from rest_framework_simplejwt.token_blacklist.models import (
+    BlacklistedToken,
+    OutstandingToken,
+)
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from apps.accounts.deletion import purge_account
@@ -224,8 +228,31 @@ def resend_otp(*, email: str) -> None:
         send_verification_code(user=user)
 
 
-def login_user(*, email: str, password: str) -> tuple[User, dict[str, str]]:
-    """Authenticate by email + password and issue JWT tokens.
+def start_session(*, user: User) -> RefreshToken:
+    """Una sesión nueva para esa cuenta: el refresh del que sale su access.
+
+    La vista la pone en cookies HttpOnly (common/auth_cookies.py); los tokens
+    nunca viajan en el cuerpo de una respuesta.
+    """
+    return RefreshToken.for_user(user)
+
+
+def end_all_sessions(*, user: User) -> None:
+    """Anula todas las sesiones abiertas de la cuenta.
+
+    Cada refresh emitido queda registrado (token_blacklist); ponerlos en la
+    lista negra deja fuera a cualquier dispositivo —o copia— que los tenga.
+    """
+    pendientes = OutstandingToken.objects.filter(
+        user=user, blacklistedtoken__isnull=True
+    )
+    BlacklistedToken.objects.bulk_create(
+        [BlacklistedToken(token=token) for token in pendientes], ignore_conflicts=True
+    )
+
+
+def login_user(*, email: str, password: str) -> tuple[User, RefreshToken]:
+    """Authenticate by email + password and open a session.
 
     Credentials are checked before verification status so that a correct
     password on an unverified account yields 403 (not 401).
@@ -244,10 +271,9 @@ def login_user(*, email: str, password: str) -> tuple[User, dict[str, str]]:
         send_verification_code(user=user)
         raise AccountNotVerified(user.verification_identity)
 
-    refresh = RefreshToken.for_user(user)
-    tokens = {"access": str(refresh.access_token), "refresh": str(refresh)}
+    session = start_session(user=user)
     logger.info("Login succeeded", extra={"user_id": str(user.pk)})
-    return user, tokens
+    return user, session
 
 
 def start_password_reset(*, email: str) -> None:
@@ -281,6 +307,8 @@ def reset_password(*, email: str, code: str, password: str) -> User:
     # suyo. Una cuenta que se quedó a medias entra de una vez.
     user.is_email_verified = True
     user.save(update_fields=["password", "is_email_verified", "updated_at"])
+    # Quien no sabía su contraseña no debe dejar abierta la sesión de nadie más.
+    end_all_sessions(user=user)
     logger.info("Password reset", extra={"user_id": str(user.pk)})
     return user
 
@@ -390,6 +418,8 @@ def change_password(*, user: User, current_password: str, new_password: str) -> 
         )
     user.set_password(new_password)
     user.save(update_fields=["password", "updated_at"])
+    # Las otras sesiones se cierran; la vista abre una nueva para quien la cambió.
+    end_all_sessions(user=user)
     logger.info("Password changed", extra={"user_id": str(user.pk)})
     return user
 

@@ -25,8 +25,8 @@ env = environ.Env(
     OTP_TTL_MINUTES=(int, 10),
     # Long enough to keep an active session working; a refresh token silently
     # renews access so the user is not logged out mid-use (see /auth/refresh/).
-    ACCESS_TOKEN_LIFETIME_MINUTES=(int, 60),
-    REFRESH_TOKEN_LIFETIME_DAYS=(int, 30),
+    ACCESS_TOKEN_LIFETIME_MINUTES=(int, 30),
+    REFRESH_TOKEN_LIFETIME_DAYS=(int, 7),
 )
 
 # Load .env from core/ if present (optional — all vars have safe defaults).
@@ -69,6 +69,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     # Third-party
     "rest_framework",
+    "rest_framework_simplejwt.token_blacklist",
     "corsheaders",
     "django_filters",
     "storages",
@@ -144,23 +145,29 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # --- DRF ---
 REST_FRAMEWORK = {
+    # El access llega en una cookie HttpOnly (common/auth_cookies.py); la
+    # cabecera Authorization sigue sirviendo a clientes de API.
     "DEFAULT_AUTHENTICATION_CLASSES": (
-        "rest_framework_simplejwt.authentication.JWTAuthentication",
+        "common.authentication.CookieJWTAuthentication",
     ),
     "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
     "DEFAULT_FILTER_BACKENDS": ("django_filters.rest_framework.DjangoFilterBackend",),
     "TEST_REQUEST_DEFAULT_FORMAT": "json",
 }
 
-# --- SimpleJWT (token lifetimes) ---
-# SimpleJWT's default access lifetime is 5 minutes; that expired mid-session and
-# logged users out ("token error"). A 60-min access + 30-day refresh, together
-# with the /auth/refresh/ endpoint and the SPA's silent-refresh interceptor,
-# keeps an active session alive.
+# --- SimpleJWT (sesión en cookies HttpOnly, iteracion-12) ---
+# Media hora de access y una semana de refresh como máximo, aunque el entorno
+# pida más: una sesión robada vale poco y por poco tiempo. El refresh rota en
+# cada renovación y el usado queda en la lista negra; salir lo anula.
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=env("ACCESS_TOKEN_LIFETIME_MINUTES")),
-    "REFRESH_TOKEN_LIFETIME": timedelta(days=env("REFRESH_TOKEN_LIFETIME_DAYS")),
-    "ROTATE_REFRESH_TOKENS": False,
+    "ACCESS_TOKEN_LIFETIME": timedelta(
+        minutes=min(env("ACCESS_TOKEN_LIFETIME_MINUTES"), 30)
+    ),
+    "REFRESH_TOKEN_LIFETIME": timedelta(
+        days=min(env("REFRESH_TOKEN_LIFETIME_DAYS"), 7)
+    ),
+    "ROTATE_REFRESH_TOKENS": True,
+    "BLACKLIST_AFTER_ROTATION": True,
     "UPDATE_LAST_LOGIN": False,
 }
 
@@ -206,6 +213,9 @@ OTP_TTL_MINUTES = env("OTP_TTL_MINUTES")
 CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOWED_ORIGINS = env("CORS_ALLOWED_ORIGINS")
 CORS_ALLOW_CREDENTIALS = True
+# La SPA escribe con la cookie de la sesión y su token CSRF: el origen de la
+# aplicación tiene que ser de confianza para la comprobación CSRF de Django.
+CSRF_TRUSTED_ORIGINS = list(dict.fromkeys(CSRF_TRUSTED_ORIGINS + CORS_ALLOWED_ORIGINS))
 
 # STATIC/MEDIA + security + logging + storages (media on R2 in production)
 from .env import *  # noqa: E402,F403

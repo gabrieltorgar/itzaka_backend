@@ -128,7 +128,7 @@ class TestIdentidad:
         )
 
         assert response.status_code == status.HTTP_200_OK
-        assert response.data["access"]
+        assert response.cookies["cuotreka_access"].value
 
     def test_a_screen_that_still_sends_identifier_can_log_in(
         self, api_client, user_factory

@@ -1,11 +1,16 @@
 """Accounts views (orchestration only; logic lives in services)."""
 
+from django.middleware.csrf import get_token
 from rest_framework import status
+from rest_framework.exceptions import ValidationError
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
+from rest_framework_simplejwt.serializers import TokenRefreshSerializer
+from rest_framework_simplejwt.tokens import RefreshToken
 
 from apps.accounts.serializers import (
     DeleteAccountSerializer,
@@ -36,9 +41,16 @@ from apps.accounts.services import (
     resend_otp,
     reset_password,
     start_password_reset,
+    start_session,
     verify_account,
 )
 from apps.legal.services import client_ip
+from common.auth_cookies import (
+    REFRESH_COOKIE,
+    clear_session_cookies,
+    set_session_cookies,
+    set_token_cookies,
+)
 
 
 class RegisterView(APIView):
@@ -93,18 +105,79 @@ class ResendOtpView(APIView):
 
 
 class LoginView(APIView):
-    """POST /api/auth/login/ — authenticate and return JWT tokens."""
+    """POST /api/auth/login/ — abrir la sesión en cookies HttpOnly.
+
+    El cuerpo sólo trae la cuenta: los tokens van en cookies que JavaScript no
+    puede leer, y el token CSRF en la suya, que la SPA sí lee para escribir.
+    """
 
     permission_classes = [AllowAny]
 
     def post(self, request: Request) -> Response:
         serializer = LoginSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        user, tokens = login_user(**serializer.validated_data)
-        return Response(
-            {**tokens, "user": UserAccountSerializer(user).data},
-            status=status.HTTP_200_OK,
+        user, session = login_user(**serializer.validated_data)
+        response = Response(
+            {"user": UserAccountSerializer(user).data}, status=status.HTTP_200_OK
         )
+        set_session_cookies(response, session)
+        get_token(request)
+        return response
+
+
+class SessionRefreshView(APIView):
+    """POST /api/auth/refresh/ — renovar la sesión con el refresh de la cookie.
+
+    El refresh rota y el usado queda en la lista negra. Sin sesión o con una
+    anulada responde 401 y borra las cookies. Público a propósito: lo que
+    autoriza es la cookie de refresh, no el access vencido.
+    """
+
+    permission_classes = [AllowAny]
+    authentication_classes: list = []
+
+    def post(self, request: Request) -> Response:
+        raw = request.COOKIES.get(REFRESH_COOKIE) or request.data.get("refresh")
+        serializer = TokenRefreshSerializer(data={"refresh": raw or ""})
+        try:
+            serializer.is_valid(raise_exception=True)
+        except (InvalidToken, TokenError, ValidationError):
+            response = Response(
+                {"detail": "La sesión terminó. Vuelve a iniciar sesión."},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+            clear_session_cookies(response)
+            return response
+        response = Response({"detail": "Sesión renovada."}, status=status.HTTP_200_OK)
+        set_token_cookies(
+            response,
+            access=serializer.validated_data["access"],
+            refresh=serializer.validated_data.get("refresh", raw),
+        )
+        get_token(request)
+        return response
+
+
+class LogoutView(APIView):
+    """POST /api/auth/logout/ — cerrar la sesión: anula el refresh y borra las cookies.
+
+    Público a propósito: salir sin sesión no falla, y una sesión vencida
+    también tiene que poder cerrarse.
+    """
+
+    permission_classes = [AllowAny]
+    authentication_classes: list = []
+
+    def post(self, request: Request) -> Response:
+        raw = request.COOKIES.get(REFRESH_COOKIE)
+        if raw:
+            try:
+                RefreshToken(raw).blacklist()
+            except TokenError:
+                pass  # ya vencida o anulada: no queda nada que cerrar
+        response = Response(status=status.HTTP_204_NO_CONTENT)
+        clear_session_cookies(response)
+        return response
 
 
 class PasswordResetRequestView(APIView):
@@ -146,6 +219,8 @@ class MyAccountView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request: Request) -> Response:
+        # La SPA lo pide al arrancar: asegura la cookie CSRF aunque haya vencido.
+        get_token(request)
         return Response(MyAccountSerializer(request.user).data)
 
     def patch(self, request: Request) -> Response:
@@ -206,10 +281,13 @@ class MyPasswordView(APIView):
     def post(self, request: Request) -> Response:
         serializer = PasswordChangeSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        change_password(user=request.user, **serializer.validated_data)
-        return Response(
+        user = change_password(user=request.user, **serializer.validated_data)
+        response = Response(
             {"detail": "Tu contraseña quedó cambiada."}, status=status.HTTP_200_OK
         )
+        # Las demás sesiones quedaron anuladas; ésta sigue con una nueva.
+        set_session_cookies(response, start_session(user=user))
+        return response
 
 
 class MyAccountDeleteView(APIView):
@@ -225,7 +303,9 @@ class MyAccountDeleteView(APIView):
         serializer = DeleteAccountSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         delete_account(user=request.user, **serializer.validated_data)
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        response = Response(status=status.HTTP_204_NO_CONTENT)
+        clear_session_cookies(response)
+        return response
 
 
 class MyOrganizationView(APIView):
