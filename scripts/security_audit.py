@@ -77,9 +77,16 @@ def python_findings() -> list[dict]:
         )
         if exp.returncode:
             raise RuntimeError(f"uv export falló: {exp.stderr.strip()}")
+        # pip-audit instala los requisitos en un entorno propio: con el Python
+        # del proyecto, o un paquete que exige uno más nuevo lo hace fallar.
+        python = run(["uv", "python", "find"])
+        if python.returncode:
+            raise RuntimeError(f"uv python find falló: {python.stderr.strip()}")
         res = run(
             [
                 "uvx",
+                "--python",
+                python.stdout.strip(),
                 "pip-audit",
                 "-r",
                 str(req),
@@ -89,8 +96,9 @@ def python_findings() -> list[dict]:
                 "off",
             ]
         )
-        if res.returncode not in (0, 1):
-            raise RuntimeError(f"pip-audit falló: {res.stderr.strip()}")
+        # 1 también es «no pudo instalar»: sin reporte, no es un «sin hallazgos».
+        if res.returncode not in (0, 1) or not res.stdout.strip():
+            raise RuntimeError(f"pip-audit falló: {res.stderr.strip()[-500:]}")
         return parse_pip_audit(res.stdout)
 
 
