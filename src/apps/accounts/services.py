@@ -9,6 +9,7 @@ from datetime import timedelta
 from django.conf import settings
 from django.contrib.auth.hashers import check_password, make_password
 from django.db import transaction
+from django.db.models import F
 from django.utils import timezone
 from rest_framework.exceptions import (
     AuthenticationFailed,
@@ -80,8 +81,12 @@ def uses_universal_code(user: User) -> bool:
     Sólo mientras el correo no esté configurado: sin él no hay por dónde
     mandar el código de nadie. En cuanto lo está, cada quien necesita el suyo
     y el universal deja de abrir la puerta.
+
+    Y sólo donde se pidió (``OTP_UNIVERSAL_CODE_ENABLED``, encendido en local):
+    en producción, una llave de correo que falte no abre todas las cuentas;
+    se intenta mandar el código propio y, si no sale, no entra nadie.
     """
-    return not mail.is_configured()
+    return settings.OTP_UNIVERSAL_CODE_ENABLED and not mail.is_configured()
 
 
 def issue_otp(*, user: User, purpose: str) -> str:
@@ -100,18 +105,32 @@ def issue_otp(*, user: User, purpose: str) -> str:
 
 
 def check_otp(*, user: User, purpose: str, code: str) -> bool:
-    """Si ese código abre esa puerta. Al usarse, se gasta."""
+    """Si ese código abre esa puerta. Al usarse, se gasta.
+
+    Cada intento fallido cuenta; al llegar a ``OTP_MAX_ATTEMPTS`` el código
+    muere aunque después llegue el correcto: seis dígitos no se adivinan en
+    cinco intentos, sí en un millón.
+    """
     if uses_universal_code(user):
         return secrets.compare_digest(str(code), str(settings.OTP_UNIVERSAL_CODE))
 
     now = timezone.now()
-    for issued in OtpCode.objects.filter(
+    live = OtpCode.objects.filter(
         user=user, purpose=purpose, used_at__isnull=True, expires_at__gt=now
-    ):
+    )
+    for issued in live:
         if check_password(str(code), issued.code_hash):
             issued.used_at = now
             issued.save(update_fields=["used_at"])
             return True
+
+    live.update(attempts=F("attempts") + 1)
+    spent = live.filter(attempts__gte=settings.OTP_MAX_ATTEMPTS).update(used_at=now)
+    if spent:
+        logger.warning(
+            "Verification code voided after repeated failures",
+            extra={"user_id": str(user.pk), "purpose": purpose},
+        )
     return False
 
 

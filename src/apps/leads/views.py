@@ -17,6 +17,7 @@ class ContactView(APIView):
     """POST /api/contact/ — dejar un mensaje sin tener cuenta."""
 
     permission_classes = [AllowAny]
+    throttle_scope = "contact"
 
     def post(self, request: Request) -> Response:
         serializer = LeadSerializer(data=request.data)

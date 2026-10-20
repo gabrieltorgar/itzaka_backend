@@ -23,6 +23,10 @@ env = environ.Env(
     LOG_DIR=(str, str(BASE_DIR / "tmp" / "logs")),
     OTP_UNIVERSAL_CODE=(str, "123456"),
     OTP_TTL_MINUTES=(int, 10),
+    # Intentos fallidos que aguanta un código antes de morir (iteracion-12).
+    OTP_MAX_ATTEMPTS=(int, 5),
+    THROTTLE_ANON=(str, "60/min"),
+    THROTTLE_USER=(str, "300/min"),
     # Long enough to keep an active session working; a refresh token silently
     # renews access so the user is not logged out mid-use (see /auth/refresh/).
     ACCESS_TOKEN_LIFETIME_MINUTES=(int, 30),
@@ -153,6 +157,37 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
     "DEFAULT_FILTER_BACKENDS": ("django_filters.rest_framework.DjangoFilterBackend",),
     "TEST_REQUEST_DEFAULT_FORMAT": "json",
+    # Límites por dirección o por cuenta en todo, y uno propio en cada puerta
+    # pública: sin tope, un código de seis dígitos se adivina probando.
+    "DEFAULT_THROTTLE_CLASSES": (
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+        "rest_framework.throttling.ScopedRateThrottle",
+    ),
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": env("THROTTLE_ANON"),
+        "user": env("THROTTLE_USER"),
+        "login": "10/min",
+        "signup": "10/hour",
+        "otp": "5/min",
+        "password_reset": "5/hour",
+        "contact": "5/hour",
+        "documents": "30/hour",
+    },
+    # Detrás del proxy de Vercel, la dirección real es la del X-Forwarded-For.
+    "NUM_PROXIES": env.int("NUM_PROXIES", default=1),
+    "EXCEPTION_HANDLER": "common.exceptions.exception_handler",
+}
+
+# --- Caché compartida (estado de los límites) ---
+# En Vercel cada invocación puede ser otra instancia: una caché en memoria no
+# cuenta nada. La tabla vive en la misma base y la crea el build
+# (createcachetable); las pruebas usan memoria local (conftest.py).
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.db.DatabaseCache",
+        "LOCATION": "cuotreka_cache",
+    }
 }
 
 # --- SimpleJWT (sesión en cookies HttpOnly, iteracion-12) ---
@@ -176,6 +211,10 @@ SIMPLE_JWT = {
 # deja de servirle; sigue siendo el de las cuentas que sólo tienen teléfono,
 # porque todavía no hay SMS por donde mandarles el suyo.
 OTP_UNIVERSAL_CODE = env("OTP_UNIVERSAL_CODE")
+# Y sólo donde se pidió: en local (DEBUG) sí; en producción hay que pedirlo a
+# propósito, para que una llave de correo que falte no abra todas las cuentas.
+OTP_UNIVERSAL_CODE_ENABLED = env.bool("OTP_UNIVERSAL_CODE_ENABLED", default=DEBUG)
+OTP_MAX_ATTEMPTS = env("OTP_MAX_ATTEMPTS")
 
 # Tope de lo que puede viajar adjunto en un correo. Un PDF de cotización pesa
 # kilobytes; uno con fotos de avance, no tanto como para pagarlo en base64.

@@ -14,6 +14,7 @@ class SendDocumentView(APIView):
     """POST /api/documents/send/ — manda el PDF al correo de quien lo recibe."""
 
     permission_classes = [IsAuthenticated]
+    throttle_scope = "documents"
     # El PDF viaja como formulario: es un archivo, no un texto.
     parser_classes = [MultiPartParser, FormParser]
 

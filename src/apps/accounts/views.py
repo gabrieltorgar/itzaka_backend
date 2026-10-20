@@ -57,6 +57,7 @@ class RegisterView(APIView):
     """POST /api/auth/register/ — crear una cuenta con correo y contraseña."""
 
     permission_classes = [AllowAny]
+    throttle_scope = "signup"
 
     def post(self, request: Request) -> Response:
         serializer = RegisterSerializer(data=request.data)
@@ -75,6 +76,7 @@ class VerifyOtpView(APIView):
     """POST /api/auth/verify-otp/ — dar por bueno el correo con el código."""
 
     permission_classes = [AllowAny]
+    throttle_scope = "otp"
 
     def post(self, request: Request) -> Response:
         serializer = VerifyOtpSerializer(data=request.data)
@@ -87,6 +89,7 @@ class ResendOtpView(APIView):
     """POST /api/auth/resend-otp/ — volver a pedir el código de verificación."""
 
     permission_classes = [AllowAny]
+    throttle_scope = "otp"
 
     def post(self, request: Request) -> Response:
         serializer = ResendOtpSerializer(data=request.data)
@@ -112,6 +115,7 @@ class LoginView(APIView):
     """
 
     permission_classes = [AllowAny]
+    throttle_scope = "login"
 
     def post(self, request: Request) -> Response:
         serializer = LoginSerializer(data=request.data)
@@ -184,6 +188,7 @@ class PasswordResetRequestView(APIView):
     """POST /api/auth/password-reset/ — pedir recuperar la contraseña."""
 
     permission_classes = [AllowAny]
+    throttle_scope = "password_reset"
 
     def post(self, request: Request) -> Response:
         serializer = PasswordResetRequestSerializer(data=request.data)
@@ -205,6 +210,7 @@ class PasswordResetConfirmView(APIView):
     """POST /api/auth/password-reset/confirm/ — fijar la contraseña nueva."""
 
     permission_classes = [AllowAny]
+    throttle_scope = "otp"
 
     def post(self, request: Request) -> Response:
         serializer = PasswordResetConfirmSerializer(data=request.data)
@@ -255,6 +261,7 @@ class MyEmailVerifyView(APIView):
     """POST /api/auth/me/email/verify/ — confirmar el correo nuevo con su código."""
 
     permission_classes = [IsAuthenticated]
+    throttle_scope = "otp"
 
     def post(self, request: Request) -> Response:
         serializer = EmailChangeConfirmSerializer(data=request.data)
@@ -267,6 +274,7 @@ class MyEmailResendView(APIView):
     """POST /api/auth/me/email/resend/ — volver a mandar el código al correo nuevo."""
 
     permission_classes = [IsAuthenticated]
+    throttle_scope = "otp"
 
     def post(self, request: Request) -> Response:
         user = resend_email_change(user=request.user)
