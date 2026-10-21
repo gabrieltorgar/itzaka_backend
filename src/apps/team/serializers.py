@@ -68,3 +68,22 @@ class AcceptInvitationSerializer(serializers.Serializer):
     privacy_version = serializers.CharField(
         max_length=40, required=False, allow_blank=True, default=""
     )
+
+
+class TeamRowSerializer(serializers.Serializer):
+    """Una fila de la tabla de colaboradores: un colaborador o una invitación."""
+
+    id = serializers.UUIDField()
+    kind = serializers.ChoiceField(choices=["member", "invitation"])
+    email = serializers.EmailField()
+    status = serializers.ChoiceField(
+        choices=["active", "inactive", "pending", "expired"]
+    )
+    since = serializers.DateTimeField()
+    expires_at = serializers.DateTimeField(allow_null=True)
+
+
+class MemberUpdateSerializer(serializers.Serializer):
+    """Activar o desactivar a un colaborador."""
+
+    is_active = serializers.BooleanField()

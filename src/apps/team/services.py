@@ -16,7 +16,7 @@ from apps.accounts.services import check_password_strength, find_user, normalize
 from apps.legal.services import record_acceptance
 from apps.team.emails import send_invitation_email
 from apps.team.models import Invitation, Membership
-from apps.team.selectors import is_member, pending_invitation
+from apps.team.selectors import get_member, is_member, pending_invitation
 from common.mail import mask_email
 
 logger = logging.getLogger("apps")
@@ -238,3 +238,38 @@ def accept_invitation(
         extra={"user_id": str(user.pk), "account_id": str(invitation.account_id)},
     )
     return user
+
+
+def _owned_member(*, account: User, member_id) -> Membership:
+    membership = get_member(account=account, member_id=member_id)
+    if membership is None:
+        raise NotFound("Ese colaborador no está en tu empresa.")
+    return membership
+
+
+def set_member_active(*, account: User, member_id, is_active: bool) -> Membership:
+    """Activar o desactivar a un colaborador (US-138).
+
+    Desactivado no entra a la empresa desde su siguiente petición; lo que
+    registró sigue ahí.
+    """
+    membership = _owned_member(account=account, member_id=member_id)
+    membership.is_active = is_active
+    membership.save(update_fields=["is_active", "updated_at"])
+    logger.info(
+        "Collaborator toggled",
+        extra={"membership_id": str(membership.pk), "active": is_active},
+    )
+    return membership
+
+
+def remove_member(*, account: User, member_id) -> None:
+    """Quitar a un colaborador de la empresa (US-138).
+
+    Deja de estar en ella; lo que registró es de la empresa y se queda. Su
+    cuenta sigue siendo suya —puede colaborar en otras o volver si lo invitan—:
+    borrarla es decisión de esa persona, no del administrador.
+    """
+    membership = _owned_member(account=account, member_id=member_id)
+    membership.delete()
+    logger.info("Collaborator removed", extra={"account_id": str(account.pk)})

@@ -13,18 +13,22 @@ from apps.accounts.serializers import UserAccountSerializer
 from apps.accounts.services import find_user, start_session
 from apps.legal.services import client_ip
 from apps.team.permissions import IsCompanyAdmin
-from apps.team.selectors import company_name
+from apps.team.selectors import company_name, member_row, team_of
 from apps.team.serializers import (
     AcceptInvitationSerializer,
     InvitationPreviewSerializer,
     InviteResultSerializer,
     InviteSerializer,
+    MemberUpdateSerializer,
+    TeamRowSerializer,
 )
 from apps.team.services import (
     accept_invitation,
     find_invitation,
     invitation_state,
     invite_collaborators,
+    remove_member,
+    set_member_active,
 )
 from apps.team.tenancy import account_of
 from common.auth_cookies import set_session_cookies
@@ -121,3 +125,41 @@ class InvitationAcceptView(APIView):
         set_session_cookies(response, start_session(user=user))
         get_token(request)
         return response
+
+
+class TeamView(APIView):
+    """GET /api/collaborators/ — colaboradores e invitaciones que esperan (US-138).
+
+    ``?search=`` busca en el correo; ``?status=`` filtra por estado (active,
+    inactive, pending, expired).
+    """
+
+    permission_classes = [IsAuthenticated, IsCompanyAdmin]
+
+    def get(self, request: Request) -> Response:
+        rows = team_of(
+            account=account_of(request),
+            search=(request.query_params.get("search") or "").strip(),
+            status=(request.query_params.get("status") or "").strip(),
+        )
+        return Response(TeamRowSerializer(rows, many=True).data)
+
+
+class MemberView(APIView):
+    """PATCH/DELETE /api/collaborators/members/<id>/ — activar, desactivar, quitar."""
+
+    permission_classes = [IsAuthenticated, IsCompanyAdmin]
+
+    def patch(self, request: Request, member_id) -> Response:
+        serializer = MemberUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        membership = set_member_active(
+            account=account_of(request),
+            member_id=member_id,
+            is_active=serializer.validated_data["is_active"],
+        )
+        return Response(TeamRowSerializer(member_row(membership)).data)
+
+    def delete(self, request: Request, member_id) -> Response:
+        remove_member(account=account_of(request), member_id=member_id)
+        return Response(status=status.HTTP_204_NO_CONTENT)
