@@ -23,7 +23,7 @@ jobs:
       SECRET_KEY: ci-secret-key-not-for-production-32chars
       DEBUG: "True"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v3
       - name: Install dependencies
         run: uv sync
