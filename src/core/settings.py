@@ -196,6 +196,7 @@ REST_FRAMEWORK = {
         "contact": "5/hour",
         "documents": "30/hour",
         "invitations": "30/hour",
+        "invitation": "30/min",
     },
     # Detrás del proxy de Vercel, la dirección real es la del X-Forwarded-For.
     "NUM_PROXIES": env.int("NUM_PROXIES", default=1),

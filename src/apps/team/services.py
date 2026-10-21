@@ -8,11 +8,14 @@ from datetime import timedelta
 
 from django.db import transaction
 from django.utils import timezone
+from rest_framework import status
+from rest_framework.exceptions import APIException, NotFound, ValidationError
 
 from apps.accounts.models import User
-from apps.accounts.services import normalize_email
+from apps.accounts.services import check_password_strength, find_user, normalize_email
+from apps.legal.services import record_acceptance
 from apps.team.emails import send_invitation_email
-from apps.team.models import Invitation
+from apps.team.models import Invitation, Membership
 from apps.team.selectors import is_member, pending_invitation
 from common.mail import mask_email
 
@@ -120,3 +123,118 @@ def invite_collaborators(*, account: User, emails: list[str]) -> InviteResult:
                 token = _refresh_link(invitation)
         result.invited.append(_send(invitation, token))
     return result
+
+
+class InvitationGone(APIException):
+    """La invitación existió pero ya no sirve: venció o se canceló."""
+
+    status_code = status.HTTP_410_GONE
+    default_code = "invitation_gone"
+
+
+class InvitationUsed(APIException):
+    """La invitación ya se aceptó: el enlace sirve una sola vez."""
+
+    status_code = status.HTTP_409_CONFLICT
+    default_code = "invitation_used"
+    default_detail = "Ya aceptaste esta invitación: inicia sesión con tu correo."
+
+
+def find_invitation(*, token: str, lock: bool = False) -> Invitation:
+    """La invitación de ese enlace.
+
+    Raises:
+        NotFound: ningún enlace emitido tiene esa huella.
+    """
+    queryset = Invitation.objects.select_related("account")
+    if lock:
+        queryset = queryset.select_for_update()
+    invitation = queryset.filter(token_hash=hash_token(token)).first()
+    if invitation is None:
+        raise NotFound("Esta invitación no existe. Revisa el enlace o pide otra.")
+    return invitation
+
+
+def invitation_state(invitation: Invitation) -> str:
+    """Pendiente, vencida, aceptada o cancelada: lo que la pantalla necesita."""
+    return "expired" if invitation.is_expired else invitation.status
+
+
+def _ensure_usable(invitation: Invitation) -> None:
+    if invitation.status == Invitation.Status.ACCEPTED:
+        raise InvitationUsed()
+    if invitation.status == Invitation.Status.CANCELLED:
+        raise InvitationGone("La invitación se canceló. Pide otra al administrador.")
+    if invitation.is_expired:
+        raise InvitationGone(
+            "La invitación venció. Pide al administrador que te la reenvíe."
+        )
+
+
+@transaction.atomic
+def accept_invitation(
+    *,
+    token: str,
+    password: str,
+    terms_version: str = "",
+    privacy_version: str = "",
+    ip_address: str | None = None,
+    user_agent: str = "",
+) -> User:
+    """Sumar a la empresa a quien recibió el enlace.
+
+    Sin cuenta, la crea ya confirmada —el enlace llegó a ese correo— y sin
+    empresa propia, con la constancia de los documentos que aceptó. Con cuenta,
+    pide su contraseña. El enlace sirve una sola vez.
+
+    Raises:
+        NotFound, InvitationGone, InvitationUsed: el enlace no sirve.
+        ValidationError: contraseña débil o equivocada, o faltan los documentos.
+    """
+    invitation = find_invitation(token=token, lock=True)
+    _ensure_usable(invitation)
+
+    user = find_user(email=invitation.email)
+    if user is None:
+        if not terms_version:
+            raise ValidationError(
+                {"terms_version": ["Acepta los términos y condiciones para continuar."]}
+            )
+        if not privacy_version:
+            raise ValidationError(
+                {
+                    "privacy_version": [
+                        "Acepta la política de privacidad para continuar."
+                    ]
+                }
+            )
+        check_password_strength(password=password, user=User(email=invitation.email))
+        user = User.objects.create_user(
+            email=invitation.email,
+            password=password,
+            is_email_verified=True,
+            has_own_workspace=False,
+        )
+        record_acceptance(
+            user=user,
+            terms_version=terms_version,
+            privacy_version=privacy_version,
+            ip_address=ip_address,
+            user_agent=user_agent,
+        )
+    else:
+        if not user.check_password(password):
+            raise ValidationError({"password": ["La contraseña no es correcta."]})
+        if not user.is_email_verified:
+            user.is_email_verified = True
+            user.save(update_fields=["is_email_verified", "updated_at"])
+
+    Membership.objects.get_or_create(account=invitation.account, user=user)
+    invitation.status = Invitation.Status.ACCEPTED
+    invitation.accepted_at = timezone.now()
+    invitation.save(update_fields=["status", "accepted_at"])
+    logger.info(
+        "Invitation accepted",
+        extra={"user_id": str(user.pk), "account_id": str(invitation.account_id)},
+    )
+    return user

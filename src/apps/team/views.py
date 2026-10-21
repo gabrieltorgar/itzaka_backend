@@ -1,13 +1,32 @@
 """Views de colaboradores: invitar y gestionar a quien trabaja en la empresa."""
 
+import uuid
+
+from django.middleware.csrf import get_token
 from rest_framework import status
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.team.serializers import InviteResultSerializer, InviteSerializer
-from apps.team.services import invite_collaborators
+from apps.accounts.serializers import UserAccountSerializer
+from apps.accounts.services import find_user, start_session
+from apps.legal.services import client_ip
+from apps.team.selectors import company_name
+from apps.team.serializers import (
+    AcceptInvitationSerializer,
+    InvitationPreviewSerializer,
+    InviteResultSerializer,
+    InviteSerializer,
+)
+from apps.team.services import (
+    accept_invitation,
+    find_invitation,
+    invitation_state,
+    invite_collaborators,
+)
+from common.auth_cookies import set_session_cookies
+from common.recaptcha import Verdict, guard_public_form
 
 
 class InvitationsView(APIView):
@@ -30,3 +49,73 @@ class InvitationsView(APIView):
             InviteResultSerializer(result).data,
             status=status.HTTP_201_CREATED if result.invited else status.HTTP_200_OK,
         )
+
+
+class InvitationDetailView(APIView):
+    """GET /api/invitations/<token>/ — de quién es la invitación y si sirve.
+
+    Público: lo que autoriza es el enlace, que sólo tiene quien recibió el
+    correo. Sin autenticación, para que una sesión vieja no estorbe.
+    """
+
+    permission_classes = [AllowAny]
+    authentication_classes: list = []
+    throttle_scope = "invitation"
+
+    def get(self, request: Request, token: str) -> Response:
+        invitation = find_invitation(token=token)
+        data = {
+            "email": invitation.email,
+            "company": company_name(account=invitation.account),
+            "status": invitation_state(invitation),
+            "account_exists": find_user(email=invitation.email) is not None,
+            "expires_at": invitation.expires_at,
+        }
+        return Response(InvitationPreviewSerializer(data).data)
+
+
+class InvitationAcceptView(APIView):
+    """POST /api/invitations/<token>/accept/ — aceptar y entrar a la empresa.
+
+    Crea la cuenta si hace falta y abre la sesión, como el acceso. Lleva
+    reCAPTCHA y campo trampa: es un formulario público que crea cuentas.
+    """
+
+    permission_classes = [AllowAny]
+    authentication_classes: list = []
+    throttle_scope = "login"
+
+    def post(self, request: Request, token: str) -> Response:
+        verdict = guard_public_form(
+            request,
+            action="invitation_accept",
+            when_unavailable="reject",
+            remote_ip=client_ip(request),
+        )
+        if verdict is Verdict.DROP:
+            # La respuesta de siempre, sin cuenta ni sesión detrás.
+            return Response(
+                {
+                    "user": {
+                        "id": str(uuid.uuid4()),
+                        "email": "",
+                        "is_email_verified": True,
+                    }
+                },
+                status=status.HTTP_201_CREATED,
+            )
+
+        serializer = AcceptInvitationSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = accept_invitation(
+            token=token,
+            ip_address=client_ip(request),
+            user_agent=request.META.get("HTTP_USER_AGENT", ""),
+            **serializer.validated_data,
+        )
+        response = Response(
+            {"user": UserAccountSerializer(user).data}, status=status.HTTP_201_CREATED
+        )
+        set_session_cookies(response, start_session(user=user))
+        get_token(request)
+        return response

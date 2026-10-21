@@ -39,3 +39,32 @@ class SkippedSerializer(serializers.Serializer):
 class InviteResultSerializer(serializers.Serializer):
     invited = SentInvitationSerializer(many=True)
     skipped = SkippedSerializer(many=True)
+
+
+class InvitationPreviewSerializer(serializers.Serializer):
+    """Lo que la pantalla de la invitación muestra antes de aceptarla."""
+
+    email = serializers.EmailField()
+    company = serializers.CharField()
+    status = serializers.CharField()
+    account_exists = serializers.BooleanField()
+    expires_at = serializers.DateTimeField()
+
+
+class AcceptInvitationSerializer(serializers.Serializer):
+    """La contraseña —nueva o la de siempre— y, para una cuenta nueva, los
+    documentos que acepta."""
+
+    password = serializers.CharField(
+        write_only=True,
+        error_messages={
+            "required": "Escribe tu contraseña.",
+            "blank": "Escribe tu contraseña.",
+        },
+    )
+    terms_version = serializers.CharField(
+        max_length=40, required=False, allow_blank=True, default=""
+    )
+    privacy_version = serializers.CharField(
+        max_length=40, required=False, allow_blank=True, default=""
+    )
