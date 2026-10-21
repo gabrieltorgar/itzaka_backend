@@ -77,3 +77,8 @@ def get_member(*, account: User, member_id) -> Membership | None:
         .filter(account=account, pk=member_id)
         .first()
     )
+
+
+def get_invitation(*, account: User, invitation_id) -> Invitation | None:
+    """La invitación de esa empresa con ese id, o nada si es de otra."""
+    return Invitation.objects.filter(account=account, pk=invitation_id).first()

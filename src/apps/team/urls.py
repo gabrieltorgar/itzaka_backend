@@ -4,7 +4,9 @@ from django.urls import path
 
 from apps.team.views import (
     InvitationAcceptView,
+    InvitationCancelView,
     InvitationDetailView,
+    InvitationResendView,
     InvitationsView,
     MemberView,
     TeamView,
@@ -18,6 +20,16 @@ urlpatterns = [
         name="member",
     ),
     path("collaborators/invitations/", InvitationsView.as_view(), name="invitations"),
+    path(
+        "collaborators/invitations/<uuid:invitation_id>/resend/",
+        InvitationResendView.as_view(),
+        name="invitation-resend",
+    ),
+    path(
+        "collaborators/invitations/<uuid:invitation_id>/cancel/",
+        InvitationCancelView.as_view(),
+        name="invitation-cancel",
+    ),
     path(
         "invitations/<str:token>/",
         InvitationDetailView.as_view(),

@@ -13,7 +13,7 @@ from apps.accounts.serializers import UserAccountSerializer
 from apps.accounts.services import find_user, start_session
 from apps.legal.services import client_ip
 from apps.team.permissions import IsCompanyAdmin
-from apps.team.selectors import company_name, member_row, team_of
+from apps.team.selectors import company_name, invitation_row, member_row, team_of
 from apps.team.serializers import (
     AcceptInvitationSerializer,
     InvitationPreviewSerializer,
@@ -24,10 +24,12 @@ from apps.team.serializers import (
 )
 from apps.team.services import (
     accept_invitation,
+    cancel_invitation,
     find_invitation,
     invitation_state,
     invite_collaborators,
     remove_member,
+    resend_invitation,
     set_member_active,
 )
 from apps.team.tenancy import account_of
@@ -162,4 +164,27 @@ class MemberView(APIView):
 
     def delete(self, request: Request, member_id) -> Response:
         remove_member(account=account_of(request), member_id=member_id)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class InvitationResendView(APIView):
+    """POST /api/collaborators/invitations/<id>/resend/ — enlace nuevo (US-139)."""
+
+    permission_classes = [IsAuthenticated, IsCompanyAdmin]
+    throttle_scope = "invitations"
+
+    def post(self, request: Request, invitation_id) -> Response:
+        sent = resend_invitation(
+            account=account_of(request), invitation_id=invitation_id
+        )
+        return Response(TeamRowSerializer(invitation_row(sent.invitation)).data)
+
+
+class InvitationCancelView(APIView):
+    """POST /api/collaborators/invitations/<id>/cancel/ — su enlace deja de servir."""
+
+    permission_classes = [IsAuthenticated, IsCompanyAdmin]
+
+    def post(self, request: Request, invitation_id) -> Response:
+        cancel_invitation(account=account_of(request), invitation_id=invitation_id)
         return Response(status=status.HTTP_204_NO_CONTENT)

@@ -16,7 +16,12 @@ from apps.accounts.services import check_password_strength, find_user, normalize
 from apps.legal.services import record_acceptance
 from apps.team.emails import send_invitation_email
 from apps.team.models import Invitation, Membership
-from apps.team.selectors import get_member, is_member, pending_invitation
+from apps.team.selectors import (
+    get_invitation,
+    get_member,
+    is_member,
+    pending_invitation,
+)
 from common.mail import mask_email
 
 logger = logging.getLogger("apps")
@@ -273,3 +278,40 @@ def remove_member(*, account: User, member_id) -> None:
     membership = _owned_member(account=account, member_id=member_id)
     membership.delete()
     logger.info("Collaborator removed", extra={"account_id": str(account.pk)})
+
+
+def _owned_waiting_invitation(*, account: User, invitation_id) -> Invitation:
+    """Una invitación de la empresa que todavía espera respuesta.
+
+    Raises:
+        NotFound: no es de esta empresa.
+        ValidationError: ya se aceptó o ya se canceló.
+    """
+    invitation = get_invitation(account=account, invitation_id=invitation_id)
+    if invitation is None:
+        raise NotFound("Esa invitación no es de tu empresa.")
+    if invitation.status == Invitation.Status.ACCEPTED:
+        raise ValidationError(
+            {"detail": "Esta invitación ya se aceptó: ya es colaborador."}
+        )
+    if invitation.status == Invitation.Status.CANCELLED:
+        raise ValidationError({"detail": "Esta invitación ya se canceló."})
+    return invitation
+
+
+def resend_invitation(*, account: User, invitation_id) -> Sent:
+    """Reenviar una invitación pendiente o vencida (US-139).
+
+    Sale con un enlace nuevo que vale 7 días; el anterior deja de servir.
+    """
+    invitation = _owned_waiting_invitation(account=account, invitation_id=invitation_id)
+    token = _refresh_link(invitation)
+    return _send(invitation, token)
+
+
+def cancel_invitation(*, account: User, invitation_id) -> None:
+    """Cancelar una invitación pendiente (US-139): su enlace deja de servir."""
+    invitation = _owned_waiting_invitation(account=account, invitation_id=invitation_id)
+    invitation.status = Invitation.Status.CANCELLED
+    invitation.save(update_fields=["status"])
+    logger.info("Invitation cancelled", extra={"invitation_id": str(invitation.pk)})
