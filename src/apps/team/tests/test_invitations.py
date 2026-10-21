@@ -5,12 +5,17 @@ uno le llega un enlace que vence en 7 días. El enlace es un secreto: en la base
 sólo queda su huella, y quien lo tiene es quien recibió el correo.
 """
 
+import os
+import subprocess
+import sys
 from datetime import timedelta
+from pathlib import Path
 
 import pytest
 from django.utils import timezone
 from rest_framework import status
 
+import core.settings as core_settings
 from apps.accounts.services import get_my_organization
 from apps.team.models import Invitation
 from apps.team.services import hash_token
@@ -239,3 +244,25 @@ class TestCasosDeBorde:
         assert response.status_code == status.HTTP_201_CREATED
         assert response.data["invited"][0]["email_sent"] is False
         assert Invitation.objects.filter(status="pending").count() == 1
+
+
+class TestEnlaceDeLaMarca:
+    """Sin APP_BASE_URL configurada, el enlace va al dominio de CUOTREKA."""
+
+    def test_the_default_base_url_is_the_brand_domain(self) -> None:
+        entorno = {k: v for k, v in os.environ.items() if k != "APP_BASE_URL"}
+        entorno["DJANGO_SETTINGS_MODULE"] = "core.settings"
+        salida = subprocess.run(  # noqa: S603 -- el mismo intérprete, sin shell
+            [
+                sys.executable,
+                "-c",
+                "from django.conf import settings as s; print(s.APP_BASE_URL)",
+            ],
+            cwd=Path(core_settings.__file__).resolve().parents[1],
+            env=entorno,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        assert salida.stdout.strip() == "https://cuotreka.vercel.app"
