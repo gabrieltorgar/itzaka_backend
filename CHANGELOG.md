@@ -3,6 +3,17 @@
 Todas las notas de cambios relevantes de la API. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es-ES/) y versionado semántico.
 
+## [3.7.1] — 2026-10-21 · iteracion-15: documentos legales en producción
+
+### Fixed
+- **legal — US-121 · US-122 · US-123 Los documentos legales en producción:**
+  `excludeFiles` de `vercel.json` dejaba fuera de la función todos los `.md`,
+  también los términos y la política de privacidad; el registro no cargaba los
+  documentos vigentes y `/api/auth/me/` respondía 500. Ahora sólo se excluyen
+  los `.md` de la raíz, y una prueba de plataforma lo vigila.
+
+---
+
 ## [3.7.0] — 2026-10-21 · iteracion-14: colaboradores invitados
 
 ### Added
