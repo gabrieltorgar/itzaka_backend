@@ -4,7 +4,11 @@ import uuid
 
 from django.middleware.csrf import get_token
 from rest_framework import status
-from rest_framework.exceptions import AuthenticationFailed, ValidationError
+from rest_framework.exceptions import (
+    AuthenticationFailed,
+    PermissionDenied,
+    ValidationError,
+)
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.request import Request
@@ -48,7 +52,8 @@ from apps.accounts.services import (
     verify_account,
 )
 from apps.legal.services import client_ip
-from apps.team.tenancy import account_of
+from apps.team.permissions import IsCompanyAdmin
+from apps.team.tenancy import account_of, is_company_admin
 from common.auth_cookies import (
     REFRESH_COOKIE,
     clear_session_cookies,
@@ -367,6 +372,9 @@ class MyOrganizationView(APIView):
         return Response(OrganizationSerializer(organization).data)
 
     def patch(self, request: Request) -> Response:
+        # La identidad de la empresa la cambia sólo su administrador (US-140).
+        if not is_company_admin(request):
+            raise PermissionDenied(IsCompanyAdmin.message)
         organization = get_my_organization(user=account_of(request))
         serializer = OrganizationSerializer(
             organization, data=request.data, partial=True

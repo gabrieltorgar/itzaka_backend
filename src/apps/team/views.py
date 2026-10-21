@@ -12,6 +12,7 @@ from rest_framework.views import APIView
 from apps.accounts.serializers import UserAccountSerializer
 from apps.accounts.services import find_user, start_session
 from apps.legal.services import client_ip
+from apps.team.permissions import IsCompanyAdmin
 from apps.team.selectors import company_name
 from apps.team.serializers import (
     AcceptInvitationSerializer,
@@ -25,6 +26,7 @@ from apps.team.services import (
     invitation_state,
     invite_collaborators,
 )
+from apps.team.tenancy import account_of
 from common.auth_cookies import set_session_cookies
 from common.recaptcha import Verdict, guard_public_form
 
@@ -36,14 +38,14 @@ class InvitationsView(APIView):
     estaban, 200 con el porqué de cada uno.
     """
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsCompanyAdmin]
     throttle_scope = "invitations"
 
     def post(self, request: Request) -> Response:
         serializer = InviteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         result = invite_collaborators(
-            account=request.user, emails=serializer.validated_data["emails"]
+            account=account_of(request), emails=serializer.validated_data["emails"]
         )
         return Response(
             InviteResultSerializer(result).data,
