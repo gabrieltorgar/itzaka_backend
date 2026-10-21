@@ -18,6 +18,13 @@ def list_workers_for_owner(*, owner) -> QuerySet[Worker]:
     )
 
 
+def get_owned_worker(*, owner, worker_id) -> Worker | None:
+    """Esa persona del personal, si es de la cuenta; si no, ninguna."""
+    if not worker_id:
+        return None
+    return Worker.objects.filter(id=worker_id, owner=owner).first()
+
+
 def list_assignments_for_owner(
     *, owner, project_id: str | None = None
 ) -> QuerySet[Assignment]:

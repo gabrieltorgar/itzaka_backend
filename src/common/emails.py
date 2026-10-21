@@ -88,3 +88,22 @@ def render_code_email(
     cuerpo = render_email(brand=brand, title=title, intro=intro, note=note)
     # El código va justo después del párrafo de entrada.
     return cuerpo.replace("</p>", "</p>" + caja, 1)
+
+
+def render_link_email(
+    *, brand: Brand, title: str, intro: str, url: str, label: str, note: str
+) -> str:
+    """El correo de un enlace: un botón que lo abre y, debajo, el enlace a la vista.
+
+    El enlace escrito sirve cuando el cliente de correo no pinta el botón.
+    """
+    boton = (
+        f'<p style="margin:20px 0 8px"><a href="{escape(url)}" '
+        f'style="display:inline-block;padding:12px 20px;border-radius:10px;'
+        f"background:{escape(brand.color)};color:#FFFFFF;font-weight:700;"
+        f'text-decoration:none;font-size:15px">{escape(label)}</a></p>'
+        f'<p style="margin:0;color:#64748B;font-size:12px;word-break:break-all">'
+        f"{escape(url)}</p>"
+    )
+    cuerpo = render_email(brand=brand, title=title, intro=intro, note=note)
+    return cuerpo.replace("</p>", "</p>" + boton, 1)

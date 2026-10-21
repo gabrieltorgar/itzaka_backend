@@ -9,6 +9,7 @@ from datetime import timedelta
 from pathlib import Path
 
 import environ
+from corsheaders.defaults import default_headers
 
 # BASE_DIR = repo root (parents: settings.py -> core -> src -> repo)
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -23,10 +24,14 @@ env = environ.Env(
     LOG_DIR=(str, str(BASE_DIR / "tmp" / "logs")),
     OTP_UNIVERSAL_CODE=(str, "123456"),
     OTP_TTL_MINUTES=(int, 10),
+    # Intentos fallidos que aguanta un código antes de morir (iteracion-12).
+    OTP_MAX_ATTEMPTS=(int, 5),
+    THROTTLE_ANON=(str, "60/min"),
+    THROTTLE_USER=(str, "300/min"),
     # Long enough to keep an active session working; a refresh token silently
     # renews access so the user is not logged out mid-use (see /auth/refresh/).
-    ACCESS_TOKEN_LIFETIME_MINUTES=(int, 60),
-    REFRESH_TOKEN_LIFETIME_DAYS=(int, 30),
+    ACCESS_TOKEN_LIFETIME_MINUTES=(int, 30),
+    REFRESH_TOKEN_LIFETIME_DAYS=(int, 7),
 )
 
 # Load .env from core/ if present (optional — all vars have safe defaults).
@@ -61,6 +66,10 @@ if _VERCEL_HOSTS:
     )
 
 INSTALLED_APPS = [
+    # Unfold antes del admin de Django, o sus plantillas nunca cargan.
+    "unfold",
+    "unfold.contrib.filters",
+    "unfold.contrib.forms",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -69,8 +78,11 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     # Third-party
     "rest_framework",
+    "rest_framework_simplejwt.token_blacklist",
     "corsheaders",
+    "csp",
     "django_filters",
+    "phonenumber_field",
     "storages",
     # Local apps
     "apps.accounts",
@@ -86,6 +98,7 @@ INSTALLED_APPS = [
     "apps.assets",
     "apps.documents",
     "apps.legal",
+    "apps.team",
 ]
 
 MIDDLEWARE = [
@@ -94,6 +107,9 @@ MIDDLEWARE = [
     # WhiteNoise serves static files (admin/DRF) from the serverless function;
     # must sit right after SecurityMiddleware.
     "whitenoise.middleware.WhiteNoiseMiddleware",
+    # Content-Security-Policy (settings_csp.py), con lo que Unfold necesita
+    # sólo bajo /admin/ (common/csp.py).
+    "common.csp.ScopedCSPMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -125,8 +141,18 @@ WSGI_APPLICATION = "core.wsgi.application"
 DATABASES = {"default": env.db("DATABASE_URL")}
 
 AUTH_USER_MODEL = "accounts.User"
+# La única pantalla con sesión de Django es el admin, y el login de Unfold no
+# manda «next»: sin esto, entrar llevaba a /accounts/profile/ (404).
+LOGIN_REDIRECT_URL = "admin:index"
 
+# Se aplican de verdad al registrarse, recuperar y cambiar la contraseña
+# (accounts.services.check_password_strength), no sólo en el admin.
 AUTH_PASSWORD_VALIDATORS = [
+    {
+        "NAME": (
+            "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"
+        )
+    },
     {
         "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
         "OPTIONS": {"min_length": 8},
@@ -144,23 +170,70 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # --- DRF ---
 REST_FRAMEWORK = {
+    # El access llega en una cookie HttpOnly (common/auth_cookies.py); la
+    # cabecera Authorization sigue sirviendo a clientes de API.
     "DEFAULT_AUTHENTICATION_CLASSES": (
-        "rest_framework_simplejwt.authentication.JWTAuthentication",
+        "common.authentication.CookieJWTAuthentication",
     ),
     "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
     "DEFAULT_FILTER_BACKENDS": ("django_filters.rest_framework.DjangoFilterBackend",),
+    # Pagina sólo si se pide (page/page_size) y nunca más de 100 por página.
+    "DEFAULT_PAGINATION_CLASS": "common.pagination.OptionalPageNumberPagination",
     "TEST_REQUEST_DEFAULT_FORMAT": "json",
+    # Límites por dirección o por cuenta en todo, y uno propio en cada puerta
+    # pública: sin tope, un código de seis dígitos se adivina probando.
+    "DEFAULT_THROTTLE_CLASSES": (
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+        "rest_framework.throttling.ScopedRateThrottle",
+    ),
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": env("THROTTLE_ANON"),
+        "user": env("THROTTLE_USER"),
+        "login": "10/min",
+        "signup": "10/hour",
+        "otp": "5/min",
+        "password_reset": "5/hour",
+        "contact": "5/hour",
+        "documents": "30/hour",
+        "invitations": "30/hour",
+        "invitation": "30/min",
+    },
+    # Detrás del proxy de Vercel, la dirección real es la del X-Forwarded-For.
+    "NUM_PROXIES": env.int("NUM_PROXIES", default=1),
+    "EXCEPTION_HANDLER": "common.exceptions.exception_handler",
+    # JSON y nada más en producción: la API navegable es una página más que
+    # cuidar (y que pone estilos en línea, que la CSP no deja pasar).
+    "DEFAULT_RENDERER_CLASSES": (
+        ("rest_framework.renderers.JSONRenderer",)
+        + (("rest_framework.renderers.BrowsableAPIRenderer",) if DEBUG else ())
+    ),
 }
 
-# --- SimpleJWT (token lifetimes) ---
-# SimpleJWT's default access lifetime is 5 minutes; that expired mid-session and
-# logged users out ("token error"). A 60-min access + 30-day refresh, together
-# with the /auth/refresh/ endpoint and the SPA's silent-refresh interceptor,
-# keeps an active session alive.
+# --- Caché compartida (estado de los límites) ---
+# En Vercel cada invocación puede ser otra instancia: una caché en memoria no
+# cuenta nada. La tabla vive en la misma base y la crea el build
+# (createcachetable); las pruebas usan memoria local (conftest.py).
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.db.DatabaseCache",
+        "LOCATION": "cuotreka_cache",
+    }
+}
+
+# --- SimpleJWT (sesión en cookies HttpOnly, iteracion-12) ---
+# Media hora de access y una semana de refresh como máximo, aunque el entorno
+# pida más: una sesión robada vale poco y por poco tiempo. El refresh rota en
+# cada renovación y el usado queda en la lista negra; salir lo anula.
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=env("ACCESS_TOKEN_LIFETIME_MINUTES")),
-    "REFRESH_TOKEN_LIFETIME": timedelta(days=env("REFRESH_TOKEN_LIFETIME_DAYS")),
-    "ROTATE_REFRESH_TOKENS": False,
+    "ACCESS_TOKEN_LIFETIME": timedelta(
+        minutes=min(env("ACCESS_TOKEN_LIFETIME_MINUTES"), 30)
+    ),
+    "REFRESH_TOKEN_LIFETIME": timedelta(
+        days=min(env("REFRESH_TOKEN_LIFETIME_DAYS"), 7)
+    ),
+    "ROTATE_REFRESH_TOKENS": True,
+    "BLACKLIST_AFTER_ROTATION": True,
     "UPDATE_LAST_LOGIN": False,
 }
 
@@ -169,6 +242,20 @@ SIMPLE_JWT = {
 # deja de servirle; sigue siendo el de las cuentas que sólo tienen teléfono,
 # porque todavía no hay SMS por donde mandarles el suyo.
 OTP_UNIVERSAL_CODE = env("OTP_UNIVERSAL_CODE")
+# Y sólo donde se pidió: en local (DEBUG) sí; en producción hay que pedirlo a
+# propósito, para que una llave de correo que falte no abra todas las cuentas.
+OTP_UNIVERSAL_CODE_ENABLED = env.bool("OTP_UNIVERSAL_CODE_ENABLED", default=DEBUG)
+OTP_MAX_ATTEMPTS = env("OTP_MAX_ATTEMPTS")
+
+# --- reCAPTCHA v3 en los formularios públicos (common/recaptcha.py) ---
+# Se verifica en cuanto hay llave secreta: sin ella no se cierra la puerta a
+# todos. La llave del sitio vive en el frontend (VITE_RECAPTCHA_SITE_KEY).
+RECAPTCHA_SECRET_KEY = env.str("RECAPTCHA_SECRET_KEY", default="").strip()
+RECAPTCHA_ENABLED = env.bool("RECAPTCHA_ENABLED", default=bool(RECAPTCHA_SECRET_KEY))
+RECAPTCHA_MIN_SCORE = env.float("RECAPTCHA_MIN_SCORE", default=0.5)
+RECAPTCHA_HOSTNAMES = env.list(
+    "RECAPTCHA_HOSTNAMES", default=["cuotreka.vercel.app", "localhost"]
+)
 
 # Tope de lo que puede viajar adjunto en un correo. Un PDF de cotización pesa
 # kilobytes; uno con fotos de avance, no tanto como para pagarlo en base64.
@@ -180,7 +267,7 @@ DOCUMENT_EMAIL_MAX_BYTES = env.int("DOCUMENT_EMAIL_MAX_BYTES", default=8 * 1024 
 RESEND_API_KEY = env.str("RESEND_API_KEY", default="").strip()
 RESEND_FROM = env.str("RESEND_FROM", default="CUOTREKA <onboarding@resend.dev>").strip()
 # A dónde llevan los enlaces de los correos: la aplicación, no la API.
-APP_BASE_URL = env.str("APP_BASE_URL", default="https://presuplano.vercel.app")
+APP_BASE_URL = env.str("APP_BASE_URL", default="https://cuotreka.vercel.app")
 
 # Tope del documento de un plano. Una textura suelta y el plano de fondo
 # escaneado viajan dentro del JSON, que es lo que puede engordarlo.
@@ -206,7 +293,23 @@ OTP_TTL_MINUTES = env("OTP_TTL_MINUTES")
 CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOWED_ORIGINS = env("CORS_ALLOWED_ORIGINS")
 CORS_ALLOW_CREDENTIALS = True
+# La empresa en la que se trabaja viaja en su propia cabecera (iteracion-14).
+CORS_ALLOW_HEADERS = (*default_headers, "x-empresa")
+# La SPA escribe con la cookie de la sesión y su token CSRF: el origen de la
+# aplicación tiene que ser de confianza para la comprobación CSRF de Django.
+CSRF_TRUSTED_ORIGINS = list(dict.fromkeys(CSRF_TRUSTED_ORIGINS + CORS_ALLOWED_ORIGINS))
+
+# Tope explícito del cuerpo de una petición que no es archivo. Vercel corta en
+# ~4.5 MB; el documento de un plano (PLAN_MAX_BYTES) es lo más grande que viaja.
+DATA_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024
+
+# --- Teléfonos (django-phonenumber-field, iteracion-13) ---
+# Se escriben como sea y se guardan en E.164; sin lada del país, son de México.
+PHONENUMBER_DEFAULT_REGION = "MX"
+PHONENUMBER_DB_FORMAT = "E164"
 
 # STATIC/MEDIA + security + logging + storages (media on R2 in production)
 from .env import *  # noqa: E402,F403
+from .settings_csp import *  # noqa: E402,F403
 from .settings_storages import *  # noqa: E402,F403
+from .settings_unfold import *  # noqa: E402,F403

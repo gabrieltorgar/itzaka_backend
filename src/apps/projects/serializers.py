@@ -8,22 +8,32 @@ from apps.projects.models import Evidence, Progress, Project
 from apps.projects.selectors import advanced_value, quoted_value
 from apps.quotes.models import Quote, QuoteItem
 from apps.staff.models import Worker
+from common.fields import OwnedPrimaryKeyRelatedField
 
 
 class StartProjectSerializer(serializers.Serializer):
     """Validates the payload to start a project (a quote id)."""
 
-    quote = serializers.PrimaryKeyRelatedField(queryset=Quote.objects.all())
+    quote = OwnedPrimaryKeyRelatedField(
+        queryset=Quote.objects.all(), not_found="Cotización no encontrada."
+    )
 
 
 class ProgressInputSerializer(serializers.Serializer):
     """Validates a progress entry (quantity + date + who did it)."""
 
-    quote_item = serializers.PrimaryKeyRelatedField(queryset=QuoteItem.objects.all())
+    quote_item = OwnedPrimaryKeyRelatedField(
+        queryset=QuoteItem.objects.all(),
+        owner_field="quote__owner",
+        not_found="Partida no encontrada.",
+    )
     quantity = serializers.DecimalField(max_digits=12, decimal_places=2)
     date = serializers.DateField()
-    worker = serializers.PrimaryKeyRelatedField(
-        queryset=Worker.objects.all(), required=False, allow_null=True
+    worker = OwnedPrimaryKeyRelatedField(
+        queryset=Worker.objects.all(),
+        not_found="Personal no encontrado.",
+        required=False,
+        allow_null=True,
     )
 
 
@@ -52,8 +62,11 @@ class ProgressUpdateSerializer(serializers.Serializer):
 
     quantity = serializers.DecimalField(max_digits=12, decimal_places=2, required=False)
     date = serializers.DateField(required=False)
-    worker = serializers.PrimaryKeyRelatedField(
-        queryset=Worker.objects.all(), required=False, allow_null=True
+    worker = OwnedPrimaryKeyRelatedField(
+        queryset=Worker.objects.all(),
+        not_found="Personal no encontrado.",
+        required=False,
+        allow_null=True,
     )
 
 

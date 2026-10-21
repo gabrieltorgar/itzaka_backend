@@ -40,7 +40,19 @@ SANDBOX_SENDER = "onboarding@resend.dev"
 #: que pone la biblioteca por omisión, la respuesta era un 403 con «error code:
 #: 1010» —una página de Cloudflare, no de Resend— y el envío no llegaba ni a
 #: aparecer en el registro de la cuenta.
-USER_AGENT = f"{BRAND_NAME}/1.0 (+https://presuplano.vercel.app)"
+USER_AGENT = f"{BRAND_NAME}/1.0 (+https://cuotreka.vercel.app)"
+
+
+def mask_email(address: str) -> str:
+    """``j***@dominio.com``: lo justo para reconocerlo, no para leerlo.
+
+    El correo de una persona es un dato personal; en los registros de la
+    plataforma queda a la vista de quien los lea (iteracion-12).
+    """
+    local, at, domain = (address or "").partition("@")
+    if not at or not local:
+        return "***"
+    return f"{local[0]}***@{domain}"
 
 
 def sender() -> str:
@@ -135,10 +147,10 @@ def send_email(
         # refused by Resend» a secas no decía nada de lo que hay que corregir.
         detail = error.read()[:500].decode("utf-8", "replace")
         logger.warning(
-            "Email refused by Resend (HTTP %s) from=%r to=%r: %s",
+            "Email refused by Resend (HTTP %s) from=%r to=%s: %s",
             error.code,
             settings.RESEND_FROM,
-            to,
+            mask_email(to),
             detail,
         )
         return False
@@ -146,5 +158,5 @@ def send_email(
         logger.warning("Email could not be sent: %s", error)
         return False
 
-    logger.info("Email sent to %r: %s", to, subject)
+    logger.info("Email sent to %s: %s", mask_email(to), subject)
     return accepted

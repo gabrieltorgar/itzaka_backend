@@ -16,6 +16,7 @@ from apps.planner.serializers import (
     PlanSerializer,
     PlanSummarySerializer,
 )
+from apps.team.tenancy import account_of
 
 
 class DailyPhotoLimitReached(APIException):
@@ -37,13 +38,13 @@ class PlanViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return list_plans_for_owner(owner=self.request.user)
+        return list_plans_for_owner(owner=account_of(self.request))
 
     def get_serializer_class(self):
         return PlanSummarySerializer if self.action == "list" else PlanSerializer
 
     def perform_create(self, serializer) -> None:
-        serializer.save(owner=self.request.user)
+        serializer.save(owner=account_of(self.request))
 
     @action(
         detail=False,
@@ -62,7 +63,7 @@ class PlanViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
 
         limit = settings.PHOTO_PLAN_DAILY_LIMIT
-        if photo_conversion.conversions_today(request.user) >= limit:
+        if photo_conversion.conversions_today(account_of(request)) >= limit:
             raise DailyPhotoLimitReached(
                 f"Llegaste al límite de {limit} fotos por día. "
                 "Vuelve a intentarlo mañana."
@@ -70,7 +71,7 @@ class PlanViewSet(viewsets.ModelViewSet):
 
         try:
             result = photo_conversion.convert_photo(
-                owner=request.user,
+                owner=account_of(request),
                 data=serializer.validated_data["photo"].read(),
                 measures=serializer.measures(),
                 skip_measures=serializer.validated_data["skip_measures"],

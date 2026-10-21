@@ -3,6 +3,145 @@
 Todas las notas de cambios relevantes de la API. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es-ES/) y versionado semántico.
 
+## [3.7.1] — 2026-10-21 · iteracion-15: documentos legales en producción
+
+### Fixed
+- **legal — US-121 · US-122 · US-123 Los documentos legales en producción:**
+  `excludeFiles` de `vercel.json` dejaba fuera de la función todos los `.md`,
+  también los términos y la política de privacidad; el registro no cargaba los
+  documentos vigentes y `/api/auth/me/` respondía 500. Ahora sólo se excluyen
+  los `.md` de la raíz, y una prueba de plataforma lo vigila.
+
+---
+
+## [3.7.0] — 2026-10-21 · iteracion-14: colaboradores invitados
+
+### Added
+- **colaboradores — US-135 Invitar colaboradores por correo:** app `team` con
+  `Membership` (quién colabora en la empresa de quién, activo o no) e
+  `Invitation` (correo, huella SHA-256 del enlace, vigencia de 7 días).
+  `POST /api/collaborators/invitations/` recibe de 1 a 20 correos y manda a
+  cada uno, con la marca de la empresa, un enlace a `/invitacion/<token>`; no
+  invita dos veces a quien ya colabora o ya tiene una invitación vigente, y
+  dice por qué se saltó cada correo (límite de 30 por hora).
+- **colaboradores — US-136 Aceptar una invitación y crear mi cuenta:**
+  `GET /api/invitations/<token>/` (público) dice a qué empresa invita y si
+  sigue vigente; `POST /api/invitations/<token>/accept/` crea la cuenta ya
+  confirmada y sin empresa propia (`User.has_own_workspace`), o pide la
+  contraseña de quien ya tiene una, abre la sesión y dice a qué empresa se
+  entra. El enlace sirve una vez (vencida o cancelada 410, ya aceptada 409);
+  reCAPTCHA y campo trampa como el registro.
+- **colaboradores — US-137 Trabajar en las empresas que me invitan:** los datos
+  se acotan a la empresa en la que se trabaja (`apps/team/tenancy.py`,
+  `account_of(request)`): la cabecera `X-Empresa` la elige; sin ella, la propia
+  o la primera donde se colabora activo. Una empresa ajena o donde lo
+  desactivaron responde 403 con `code: company_access`. `/api/auth/me/` trae
+  `companies` (id, nombre y papel). Los documentos salen con la marca de la
+  empresa y las respuestas llegan a quien los manda.
+- **colaboradores — US-138 Gestionar a mis colaboradores:**
+  `GET /api/collaborators/` (con `?search=` y `?status=`) junta colaboradores
+  e invitaciones que esperan; `PATCH/DELETE /api/collaborators/members/<id>/`
+  activa, desactiva o quita de la empresa —lo registrado se queda y la cuenta
+  sigue siendo de la persona—.
+- **colaboradores — US-139 Reenviar o cancelar una invitación:**
+  `POST /api/collaborators/invitations/<id>/resend/` (enlace nuevo por 7 días;
+  el anterior deja de servir) y `…/cancel/`.
+
+### Changed
+- **organización — US-140 Lo que sólo el administrador decide:** cambiar la
+  organización (nombre, color, logotipo, contacto) e invitar o gestionar
+  colaboradores responden 403 a un colaborador (`IsCompanyAdmin`); ver la
+  organización sigue abierto. US-71, US-102 y US-118 cambian en lo mismo.
+- **cuenta — US-126:** un colaborador que elimina su cuenta no borra nada de
+  la empresa.
+- **CORS:** deja pasar la cabecera `X-Empresa`.
+
+---
+
+## [3.6.0] — 2026-10-20 · iteracion-13: plataforma y convenciones (admin, teléfonos y capas)
+
+### Changed
+- **admin — TEC Django Unfold:** el panel de administración usa Unfold en
+  todos los modelos de la aplicación (se suman las partidas de cotización y los
+  servicios del personal), con el usuario por correo en formularios de Unfold y
+  los grupos registrados de nuevo. La CSP sólo se abre bajo `/admin/` para lo
+  que Unfold necesita (`'unsafe-eval'` de Alpine y estilos en línea); la API
+  conserva la estricta. Entrar al admin lleva a `/admin/`.
+- **clientes — US-07 Teléfonos validados:** el teléfono de clientes,
+  organización, personal y contactos se valida (`django-phonenumber-field`,
+  región MX) y se guarda en E.164; la API lo devuelve como se escribe en México
+  («55 1234 5678») o con su lada si es de fuera. Uno que no es teléfono se
+  rechaza con «Escribe un teléfono válido, con su lada.». La migración pasa a
+  E.164 los que ya estaban sin perder los que no se pueden leer.
+- **arquitectura — TEC Capas e higiene:** las consultas y reglas de personal
+  pasan de las vistas a `staff/selectors.py` y `staff/services.py`
+  (`get_owned_worker`, `ensure_single_self`, `hand_out`). Pruebas de
+  arquitectura: ninguna vista consulta modelos directamente y
+  `requirements.txt` es exactamente el `uv export` del `uv.lock`.
+
+### Fixed
+- **dependencias vulnerables:** Pillow 13.0 corrige ocho vulnerabilidades altas
+  publicadas después de la 3.5.0 que encontró el workflow `security`.
+
+---
+
+## [3.5.0] — 2026-10-20 · iteracion-12: seguridad (sesión, límites, reCAPTCHA, archivos y línea base)
+
+### Added
+- **seguridad — TEC Línea base de seguridad en pruebas y CI:**
+  `src/tests/platform/test_security_baseline.py` vigila permisos y límites por
+  defecto, caché compartida, tope de página, validadores de contraseña, cookies,
+  cabeceras y el bloque HTTPS de producción, y revisa el código (campos
+  explícitos, SQL con parámetros, ninguna credencial en los registros). Workflow
+  `security` (gitleaks y pip-audit, con excepciones que vencen), Dependabot
+  semanal contra `develop` y un solo umbral de cobertura (90 %).
+
+### Changed
+- **accounts — US-03 Sesión en cookies seguras:** el inicio de sesión deja el
+  access (≤ 30 min) y el refresh (≤ 7 días) en cookies HttpOnly SameSite=Lax,
+  Secure en producción; el cuerpo sólo trae la cuenta. El refresh rota en cada
+  renovación (`POST /api/auth/refresh/`) y el usado queda en la lista negra;
+  `POST /api/auth/logout/` lo anula y borra las cookies; cambiar o restablecer la
+  contraseña cierra las demás sesiones. Las escrituras con la cookie exigen el
+  token CSRF (`X-CSRFToken`). La cabecera `Authorization` sigue sirviendo.
+- **API — límites de intentos (US-02):** throttling en toda la API (60/min por
+  dirección, 300/min por cuenta) y por puerta: acceso 10/min, registro 10/h,
+  códigos 5/min, recuperación 5/h, contacto 5/h, envío de documentos 30/h. Los
+  contadores viven en la caché de la base (el build corre `createcachetable`) y
+  el 429 dice «Demasiados intentos. Intenta de nuevo en N segundos.».
+- **formularios públicos — US-83 reCAPTCHA y campo trampa:** registro, acceso,
+  recuperación y contacto verifican un token de reCAPTCHA v3 por acción
+  (`recaptcha_token`) antes de validar nada, en cuanto hay
+  `RECAPTCHA_SECRET_KEY`; si Google no contesta, las puertas de la cuenta
+  responden 503 y el contacto se guarda «por revisar» (`Lead.needs_review`). Un
+  campo `website` lleno recibe la respuesta de siempre sin ningún efecto.
+- **archivos — US-16 validados por su contenido:** evidencia, logotipo,
+  texturas, piezas de mobiliario y documentos se juzgan por sus primeros bytes
+  (filetype) y se guardan como `<uuid>.<ext>`; por correo sólo sale un PDF, con
+  el nombre que pone el servidor. `R2_SIGNED_URLS` sirve el bucket privado con
+  direcciones firmadas que vencen (apagado hasta cerrar el bucket).
+- **seguridad — TEC Configuración de Django:** CSP estricta (django-csp),
+  Referrer-Policy explícita, sólo JSON en producción, paginación opcional con
+  tope de 100 por página (`page`, `page_size`) y tope del cuerpo de 5 MB.
+
+### Fixed
+- **accounts — contraseñas débiles:** los cuatro validadores de Django (con el
+  de parecido al correo) se aplican al registrarse, recuperar y cambiar la
+  contraseña; antes sólo se revisaba el largo.
+- **accounts — código de verificación adivinable:** cada código muere al quinto
+  intento fallido, y el código universal del MVP sólo abre cuentas sin correo
+  configurado y donde se pidió (`OTP_UNIVERSAL_CODE_ENABLED`, encendido con
+  `DEBUG`): en producción falla cerrado.
+- **US-18 referencias de otra cuenta:** un id ajeno en una escritura se rechaza
+  con el mismo mensaje que uno que no existe (`OwnedPrimaryKeyRelatedField`), y
+  ya no queda un trabajador creado a medias cuando su servicio era ajeno. Pruebas
+  de acceso cruzado para cada recurso.
+- **correo — dato personal en los registros:** el destinatario se registra
+  enmascarado (`j***@dominio.com`).
+- **dependencias vulnerables:** pyjwt 2.15.1, sqlparse 0.6.0, Pillow 12.3,
+  Django 5.2.18, djangorestframework 3.17.2 y urllib3 2.8.0 corrigen
+  vulnerabilidades altas que encontró el workflow `security`.
+
 ## [3.3.1] — 2026-10-14 · iteracion-9: configuración de despliegue en Vercel
 
 ### Changed
@@ -125,7 +264,6 @@ Todas las notas de cambios relevantes de la API. El formato sigue
 ### Notes
 - Desde esta entrega la API comparte la **versión del producto** con la
   interfaz (antes llevaba su propia numeración; la última fue 1.19.0).
-
 
 ### Removed
 - **docs — La documentación pasa a la memoria del proyecto:** `DEPLOY.md` se

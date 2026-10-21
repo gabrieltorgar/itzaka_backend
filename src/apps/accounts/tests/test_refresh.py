@@ -1,11 +1,13 @@
-"""Tests for the token refresh endpoint (silent session renewal).
+"""Tests for the session refresh endpoint (silent session renewal).
 
-A valid refresh token must yield a fresh access token so an active session is
-never dropped when the short-lived access token expires.
+A valid refresh must yield a fresh access so an active session is never dropped
+when the short-lived access expires. Since iteracion-12 both travel in HttpOnly
+cookies; a client that still sends the refresh in the body is served too.
 """
 
 import pytest
 from rest_framework import status
+from rest_framework.test import APIClient
 
 LOGIN_URL = "/api/auth/login/"
 REFRESH_URL = "/api/auth/refresh/"
@@ -13,22 +15,35 @@ REFRESH_URL = "/api/auth/refresh/"
 
 @pytest.mark.django_db
 class TestTokenRefresh:
-    """POST /api/auth/refresh/ exchanges a refresh token for a new access."""
+    """POST /api/auth/refresh/ exchanges the refresh for a new session."""
 
-    def test_valid_refresh_returns_new_access_token(
+    def test_valid_refresh_cookie_renews_the_session(
         self, api_client, user_factory
     ) -> None:
-        """A refresh token obtained at login yields a new access token."""
+        """The refresh cookie set at login yields new session cookies."""
+        account = user_factory(is_email_verified=True, password="testpass123")
+        api_client.post(LOGIN_URL, {"email": account.email, "password": "testpass123"})
+
+        response = api_client.post(REFRESH_URL)
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.cookies["cuotreka_access"].value
+        assert "access" not in response.data
+
+    def test_a_refresh_sent_in_the_body_still_works(
+        self, api_client, user_factory
+    ) -> None:
+        """An API client without cookies can renew with the refresh in the body."""
         account = user_factory(is_email_verified=True, password="testpass123")
         login = api_client.post(
             LOGIN_URL, {"email": account.email, "password": "testpass123"}
         )
-        refresh = login.data["refresh"]
+        refresh = login.cookies["cuotreka_refresh"].value
 
-        response = api_client.post(REFRESH_URL, {"refresh": refresh})
+        response = APIClient().post(REFRESH_URL, {"refresh": refresh})
 
         assert response.status_code == status.HTTP_200_OK
-        assert response.data["access"]
+        assert response.cookies["cuotreka_access"].value
 
     def test_invalid_refresh_returns_401(self, api_client) -> None:
         """A bogus refresh token is rejected with 401."""

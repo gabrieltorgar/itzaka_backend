@@ -2,13 +2,13 @@
 
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
-from rest_framework.exceptions import NotFound, ValidationError
+from rest_framework.exceptions import NotFound
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 
-from apps.staff.models import Worker
 from apps.staff.selectors import (
+    get_owned_worker,
     list_assignments_for_owner,
     list_worker_payments_for_owner,
     list_workers_for_owner,
@@ -21,7 +21,13 @@ from apps.staff.serializers import (
     WorkerPaymentSerializer,
     WorkerSerializer,
 )
-from apps.staff.services import assign_service, pay_worker, set_worker_services
+from apps.staff.services import (
+    ensure_single_self,
+    hand_out,
+    pay_worker,
+    set_worker_services,
+)
+from apps.team.tenancy import account_of
 
 
 class WorkerViewSet(viewsets.ModelViewSet):
@@ -31,31 +37,24 @@ class WorkerViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return list_workers_for_owner(owner=self.request.user)
+        return list_workers_for_owner(owner=account_of(self.request))
 
     def perform_create(self, serializer) -> None:
         services = serializer.validated_data.pop("services", [])
-        self._guard_single_self(serializer.validated_data.get("is_self", False))
-        worker = serializer.save(owner=self.request.user)
+        if serializer.validated_data.get("is_self", False):
+            ensure_single_self(owner=account_of(self.request))
+        worker = serializer.save(owner=account_of(self.request))
         set_worker_services(worker=worker, services=services)
 
     def perform_update(self, serializer) -> None:
         services = serializer.validated_data.pop("services", None)
         if serializer.validated_data.get("is_self", False):
-            self._guard_single_self(True, exclude=serializer.instance.pk)
+            ensure_single_self(
+                owner=account_of(self.request), exclude=serializer.instance.pk
+            )
         worker = serializer.save()
         if services is not None:
             set_worker_services(worker=worker, services=services)
-
-    def _guard_single_self(self, is_self: bool, exclude=None) -> None:
-        """«Yo» es uno solo: dos despachos propios no significan nada."""
-        if not is_self:
-            return
-        others = Worker.objects.filter(owner=self.request.user, is_self=True)
-        if exclude is not None:
-            others = others.exclude(pk=exclude)
-        if others.exists():
-            raise ValidationError("Ya tienes un registro tuyo en el personal")
 
 
 class AssignmentViewSet(viewsets.ModelViewSet):
@@ -66,17 +65,16 @@ class AssignmentViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         return list_assignments_for_owner(
-            owner=self.request.user,
+            owner=account_of(self.request),
             project_id=self.request.query_params.get("project"),
         )
 
     def _hand_out(self, request: Request, payload: dict):
-        serializer = AssignmentInputSerializer(data=payload)
+        serializer = AssignmentInputSerializer(
+            data=payload, context={"request": request}
+        )
         serializer.is_valid(raise_exception=True)
-        data = dict(serializer.validated_data)
-        if data["project"].owner_id != request.user.id:
-            raise NotFound("Proyecto no encontrado.")
-        return assign_service(**data)
+        return hand_out(owner=account_of(request), **serializer.validated_data)
 
     def create(self, request: Request, *args, **kwargs) -> Response:
         assignment = self._hand_out(request, request.data)
@@ -107,15 +105,17 @@ class WorkerPaymentViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         return list_worker_payments_for_owner(
-            owner=self.request.user,
+            owner=account_of(self.request),
             worker_id=self.request.query_params.get("worker"),
             project_id=self.request.query_params.get("project"),
         )
 
     def create(self, request: Request, *args, **kwargs) -> Response:
-        serializer = WorkerPaymentInputSerializer(data=request.data)
+        serializer = WorkerPaymentInputSerializer(
+            data=request.data, context={"request": request}
+        )
         serializer.is_valid(raise_exception=True)
-        payment = pay_worker(owner=request.user, **serializer.validated_data)
+        payment = pay_worker(owner=account_of(request), **serializer.validated_data)
         return Response(
             WorkerPaymentSerializer(payment).data, status=status.HTTP_201_CREATED
         )
@@ -124,13 +124,13 @@ class WorkerPaymentViewSet(viewsets.ReadOnlyModelViewSet):
     def summary(self, request: Request) -> Response:
         """Las cuatro cifras de una persona, con sus pagos."""
         worker_id = request.query_params.get("worker")
-        worker = Worker.objects.filter(id=worker_id, owner=request.user).first()
+        worker = get_owned_worker(owner=account_of(request), worker_id=worker_id)
         if worker is None:
             raise NotFound("Personal no encontrado.")
 
         project_id = request.query_params.get("project")
         payments = list_worker_payments_for_owner(
-            owner=request.user, worker_id=worker_id, project_id=project_id
+            owner=account_of(request), worker_id=worker_id, project_id=project_id
         )
         return Response(
             {

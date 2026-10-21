@@ -48,8 +48,15 @@ MEDIA_ROOT = env.str("MEDIA_ROOT", default=os.path.join(REPO_ROOT, "media"))
 # --- Cookies (siempre activas) ---
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = "Lax"
-CSRF_COOKIE_HTTPONLY = True
+# La SPA lee el token CSRF para mandarlo en cada escritura (X-CSRFToken); en
+# HttpOnly no añade protección y deja sin poder escribir a la aplicación.
+CSRF_COOKIE_HTTPONLY = False
 CSRF_COOKIE_SAMESITE = "Lax"
+
+# --- Cabeceras (siempre) ---
+# Explícito aunque sea el valor de Django: ninguna dirección de la API sale
+# completa hacia otro sitio.
+SECURE_REFERRER_POLICY = "same-origin"
 
 # --- Endurecimiento de seguridad para producción ---
 if not DEBUG:

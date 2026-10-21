@@ -78,7 +78,7 @@ class TestPasswordReset:
         )
 
         assert entrada.status_code == status.HTTP_200_OK
-        assert "access" in entrada.data
+        assert entrada.cookies["cuotreka_access"].value
 
     def test_a_wrong_code_changes_nothing(self, api_client, user) -> None:
         """Caso alternativo - Un código inválido no cambia la contraseña."""

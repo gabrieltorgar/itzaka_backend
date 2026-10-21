@@ -22,6 +22,7 @@ from apps.quotes.services import (
     sync_quote_with_plan,
     update_quote,
 )
+from apps.team.tenancy import account_of
 
 
 class QuoteViewSet(viewsets.ModelViewSet):
@@ -31,11 +32,12 @@ class QuoteViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return list_quotes_for_owner(owner=self.request.user)
+        return list_quotes_for_owner(owner=account_of(self.request))
 
     def _write(self, request: Request):
         serializer = QuoteWriteSerializer(
-            data=request.data, context={"owner": request.user, "request": request}
+            data=request.data,
+            context={"owner": account_of(request), "request": request},
         )
         serializer.is_valid(raise_exception=True)
         return serializer.validated_data
@@ -43,7 +45,7 @@ class QuoteViewSet(viewsets.ModelViewSet):
     def create(self, request: Request, *args, **kwargs) -> Response:
         data = self._write(request)
         quote = create_quote(
-            owner=request.user,
+            owner=account_of(request),
             client=data["client"],
             items_data=data["items"],
             notes=data.get("notes"),
@@ -71,7 +73,7 @@ class QuoteViewSet(viewsets.ModelViewSet):
     def plan_sync(self, request: Request, pk=None) -> Response:
         """POST /quotes/{id}/plan-sync/ — la cotización al día con su plano."""
         quote = self.get_object()
-        serializer = PlanSyncSerializer(data=request.data)
+        serializer = PlanSyncSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         quote = sync_quote_with_plan(
             quote=quote,

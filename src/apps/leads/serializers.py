@@ -3,6 +3,7 @@
 from rest_framework import serializers
 
 from apps.leads.models import MESSAGE_MAX_LENGTH, Lead
+from common.phones import PhoneField
 
 
 class LeadSerializer(serializers.ModelSerializer):
@@ -11,6 +12,7 @@ class LeadSerializer(serializers.ModelSerializer):
     message = serializers.CharField(
         max_length=MESSAGE_MAX_LENGTH, required=False, allow_blank=True
     )
+    phone = PhoneField()
 
     class Meta:
         model = Lead

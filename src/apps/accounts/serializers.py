@@ -5,6 +5,9 @@ from rest_framework import serializers
 from apps.accounts.models import HEX_COLOR_VALIDATOR, Organization, Subscription, User
 from apps.legal.serializers import AcceptanceSerializer
 from apps.legal.services import check_versions, status_for
+from apps.team.tenancy import companies_of
+from common.phones import PhoneField
+from common.validators import IMAGES, validate_upload
 
 MIN_PASSWORD_LENGTH = 8
 
@@ -195,6 +198,7 @@ class SubscriptionSerializer(serializers.ModelSerializer):
 
 #: Lo que puede pesar un logotipo. Es una marca, no una fotografía.
 LOGO_MAX_BYTES = 2 * 1024 * 1024
+LOGO_MAX_PIXELS = 25_000_000
 
 
 class OrganizationSerializer(serializers.ModelSerializer):
@@ -218,9 +222,7 @@ class OrganizationSerializer(serializers.ModelSerializer):
         allow_blank=True,
         error_messages={"invalid": "Escribe un correo válido"},
     )
-    phone = serializers.CharField(
-        max_length=30, required=False, allow_blank=True, trim_whitespace=True
-    )
+    phone = PhoneField()
 
     # Sube un archivo y se lee como dirección: el documento no carga bytes,
     # carga una imagen que ya está en la cuenta.
@@ -235,10 +237,15 @@ class OrganizationSerializer(serializers.ModelSerializer):
         """Un logotipo es una imagen, y no una de varios megas."""
         if value in (None, ""):
             return None
-        if value.size > LOGO_MAX_BYTES:
-            raise serializers.ValidationError(
-                f"El logotipo pesa más de {LOGO_MAX_BYTES // (1024 * 1024)} MB"
-            )
+        ext = validate_upload(
+            value,
+            allowed=IMAGES,
+            max_bytes=LOGO_MAX_BYTES,
+            max_pixels=LOGO_MAX_PIXELS,
+            too_big=f"El logotipo pesa más de {LOGO_MAX_BYTES // (1024 * 1024)} MB",
+            not_allowed="El logotipo tiene que ser una imagen PNG, JPG, WebP o GIF",
+        )
+        value.name = f"logo.{ext}"
         return value
 
     def to_representation(self, instance: Organization) -> dict:
@@ -263,6 +270,7 @@ class MyAccountSerializer(serializers.ModelSerializer):
     subscription = SubscriptionSerializer(read_only=True)
     organization = OrganizationSerializer(read_only=True)
     legal = serializers.SerializerMethodField()
+    companies = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -275,8 +283,16 @@ class MyAccountSerializer(serializers.ModelSerializer):
             "created_at",
             "subscription",
             "organization",
+            "companies",
         ]
         read_only_fields = fields
+
+    def get_companies(self, obj: User) -> list[dict]:
+        """Las empresas donde trabaja, la propia primero (iteracion-14)."""
+        return [
+            {"id": str(c.account.pk), "name": c.name, "role": c.role}
+            for c in companies_of(obj)
+        ]
 
     def get_legal(self, obj: User) -> dict:
         """Qué documentos rigen, cuáles aceptó y si le falta aceptar alguno."""

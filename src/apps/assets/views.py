@@ -20,6 +20,7 @@ from apps.assets.serializers import (
     PlanAssetSerializer,
 )
 from apps.assets.services import remove_models, store_asset, store_models
+from apps.team.tenancy import account_of
 
 
 class PlanAssetViewSet(viewsets.ReadOnlyModelViewSet):
@@ -31,12 +32,14 @@ class PlanAssetViewSet(viewsets.ReadOnlyModelViewSet):
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def get_queryset(self):
-        return list_assets_for_owner(owner=self.request.user)
+        return list_assets_for_owner(owner=account_of(self.request))
 
     def create(self, request: Request, *args, **kwargs) -> Response:
         serializer = PlanAssetInputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        asset, created = store_asset(owner=request.user, **serializer.validated_data)
+        asset, created = store_asset(
+            owner=account_of(request), **serializer.validated_data
+        )
         return Response(
             PlanAssetSerializer(asset).data,
             # Ya estaba: el resultado es el que se pedía, pero no se creó nada.
@@ -51,7 +54,7 @@ class PlanAssetViewSet(viewsets.ReadOnlyModelViewSet):
         return Response(
             {
                 "missing": missing_paths(
-                    owner=request.user, paths=serializer.validated_data["paths"]
+                    owner=account_of(request), paths=serializer.validated_data["paths"]
                 )
             }
         )
@@ -69,7 +72,7 @@ class CatalogModelViewSet(viewsets.ViewSet):
     def list(self, request: Request) -> Response:
         """Las fichas que tiene la cuenta."""
         return Response(
-            [row.fiche for row in list_models_for_owner(owner=request.user)]
+            [row.fiche for row in list_models_for_owner(owner=account_of(request))]
         )
 
     def create(self, request: Request) -> Response:
@@ -77,7 +80,7 @@ class CatalogModelViewSet(viewsets.ViewSet):
         serializer = CatalogModelsInputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         stored = store_models(
-            owner=request.user, fiches=serializer.validated_data["models"]
+            owner=account_of(request), fiches=serializer.validated_data["models"]
         )
         return Response({"stored": stored}, status=status.HTTP_201_CREATED)
 
@@ -92,6 +95,6 @@ class CatalogModelViewSet(viewsets.ViewSet):
         serializer = ModelIdsSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         removed = remove_models(
-            owner=request.user, ids=serializer.validated_data["ids"]
+            owner=account_of(request), ids=serializer.validated_data["ids"]
         )
         return Response({"removed": removed})

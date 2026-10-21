@@ -7,14 +7,21 @@ import secrets
 from datetime import timedelta
 
 from django.conf import settings
+from django.contrib.auth import password_validation
 from django.contrib.auth.hashers import check_password, make_password
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
+from django.db.models import F
 from django.utils import timezone
 from rest_framework.exceptions import (
     AuthenticationFailed,
     NotFound,
     PermissionDenied,
     ValidationError,
+)
+from rest_framework_simplejwt.token_blacklist.models import (
+    BlacklistedToken,
+    OutstandingToken,
 )
 from rest_framework_simplejwt.tokens import RefreshToken
 
@@ -76,8 +83,12 @@ def uses_universal_code(user: User) -> bool:
     Sólo mientras el correo no esté configurado: sin él no hay por dónde
     mandar el código de nadie. En cuanto lo está, cada quien necesita el suyo
     y el universal deja de abrir la puerta.
+
+    Y sólo donde se pidió (``OTP_UNIVERSAL_CODE_ENABLED``, encendido en local):
+    en producción, una llave de correo que falte no abre todas las cuentas;
+    se intenta mandar el código propio y, si no sale, no entra nadie.
     """
-    return not mail.is_configured()
+    return settings.OTP_UNIVERSAL_CODE_ENABLED and not mail.is_configured()
 
 
 def issue_otp(*, user: User, purpose: str) -> str:
@@ -96,18 +107,32 @@ def issue_otp(*, user: User, purpose: str) -> str:
 
 
 def check_otp(*, user: User, purpose: str, code: str) -> bool:
-    """Si ese código abre esa puerta. Al usarse, se gasta."""
+    """Si ese código abre esa puerta. Al usarse, se gasta.
+
+    Cada intento fallido cuenta; al llegar a ``OTP_MAX_ATTEMPTS`` el código
+    muere aunque después llegue el correcto: seis dígitos no se adivinan en
+    cinco intentos, sí en un millón.
+    """
     if uses_universal_code(user):
         return secrets.compare_digest(str(code), str(settings.OTP_UNIVERSAL_CODE))
 
     now = timezone.now()
-    for issued in OtpCode.objects.filter(
+    live = OtpCode.objects.filter(
         user=user, purpose=purpose, used_at__isnull=True, expires_at__gt=now
-    ):
+    )
+    for issued in live:
         if check_password(str(code), issued.code_hash):
             issued.used_at = now
             issued.save(update_fields=["used_at"])
             return True
+
+    live.update(attempts=F("attempts") + 1)
+    spent = live.filter(attempts__gte=settings.OTP_MAX_ATTEMPTS).update(used_at=now)
+    if spent:
+        logger.warning(
+            "Verification code voided after repeated failures",
+            extra={"user_id": str(user.pk), "purpose": purpose},
+        )
     return False
 
 
@@ -143,6 +168,23 @@ def send_verification_code(
 
 
 @transaction.atomic
+def check_password_strength(
+    *, password: str, user: User, field: str = "password"
+) -> None:
+    """Los validadores de Django (AUTH_PASSWORD_VALIDATORS), en la API.
+
+    Antes sólo se pedía el largo: «password123» o una derivada del propio correo
+    pasaban. Se aplican al registrarse, al recuperar y al cambiar la contraseña.
+
+    Raises:
+        ValidationError: ``{field: [motivos]}``.
+    """
+    try:
+        password_validation.validate_password(password, user=user)
+    except DjangoValidationError as exc:
+        raise ValidationError({field: list(exc.messages)}) from None
+
+
 def register_user(
     *,
     email: str,
@@ -162,6 +204,7 @@ def register_user(
     email = normalize_email(email)
     if not email:
         raise ValidationError({"email": "Necesitas un correo para registrarte"})
+    check_password_strength(password=password, user=User(email=email))
 
     user = User.objects.create_user(email=email, password=password)
     Subscription.objects.create(
@@ -224,8 +267,31 @@ def resend_otp(*, email: str) -> None:
         send_verification_code(user=user)
 
 
-def login_user(*, email: str, password: str) -> tuple[User, dict[str, str]]:
-    """Authenticate by email + password and issue JWT tokens.
+def start_session(*, user: User) -> RefreshToken:
+    """Una sesión nueva para esa cuenta: el refresh del que sale su access.
+
+    La vista la pone en cookies HttpOnly (common/auth_cookies.py); los tokens
+    nunca viajan en el cuerpo de una respuesta.
+    """
+    return RefreshToken.for_user(user)
+
+
+def end_all_sessions(*, user: User) -> None:
+    """Anula todas las sesiones abiertas de la cuenta.
+
+    Cada refresh emitido queda registrado (token_blacklist); ponerlos en la
+    lista negra deja fuera a cualquier dispositivo —o copia— que los tenga.
+    """
+    pendientes = OutstandingToken.objects.filter(
+        user=user, blacklistedtoken__isnull=True
+    )
+    BlacklistedToken.objects.bulk_create(
+        [BlacklistedToken(token=token) for token in pendientes], ignore_conflicts=True
+    )
+
+
+def login_user(*, email: str, password: str) -> tuple[User, RefreshToken]:
+    """Authenticate by email + password and open a session.
 
     Credentials are checked before verification status so that a correct
     password on an unverified account yields 403 (not 401).
@@ -244,10 +310,9 @@ def login_user(*, email: str, password: str) -> tuple[User, dict[str, str]]:
         send_verification_code(user=user)
         raise AccountNotVerified(user.verification_identity)
 
-    refresh = RefreshToken.for_user(user)
-    tokens = {"access": str(refresh.access_token), "refresh": str(refresh)}
+    session = start_session(user=user)
     logger.info("Login succeeded", extra={"user_id": str(user.pk)})
-    return user, tokens
+    return user, session
 
 
 def start_password_reset(*, email: str) -> None:
@@ -257,7 +322,7 @@ def start_password_reset(*, email: str) -> None:
     endpoint en un detector de clientes—, así que sólo se anota.
     """
     user = find_user(email=email)
-    logger.info("Password reset requested", extra={"account_known": user is not None})
+    logger.info("Account recovery requested", extra={"account_known": user is not None})
     if user is not None:
         send_verification_code(user=user, purpose=OtpCode.Purpose.PASSWORD_RESET)
 
@@ -267,12 +332,14 @@ def reset_password(*, email: str, code: str, password: str) -> User:
 
     Raises:
         NotFound: no existe una cuenta con ese correo.
-        ValidationError: el código no es el correcto.
+        ValidationError: la contraseña es débil o el código no es el correcto.
     """
     user = find_user(email=email)
     if user is None:
         raise NotFound("No existe una cuenta con ese correo.")
 
+    # Antes de gastar el código: una contraseña débil no obliga a pedir otro.
+    check_password_strength(password=password, user=user)
     if not check_otp(user=user, purpose=OtpCode.Purpose.PASSWORD_RESET, code=code):
         raise ValidationError("Código de verificación inválido")
 
@@ -281,7 +348,9 @@ def reset_password(*, email: str, code: str, password: str) -> User:
     # suyo. Una cuenta que se quedó a medias entra de una vez.
     user.is_email_verified = True
     user.save(update_fields=["password", "is_email_verified", "updated_at"])
-    logger.info("Password reset", extra={"user_id": str(user.pk)})
+    # Quien no sabía su contraseña no debe dejar abierta la sesión de nadie más.
+    end_all_sessions(user=user)
+    logger.info("Account recovered", extra={"user_id": str(user.pk)})
     return user
 
 
@@ -388,9 +457,12 @@ def change_password(*, user: User, current_password: str, new_password: str) -> 
         raise ValidationError(
             {"new_password": "La contraseña nueva debe ser distinta de la actual"}
         )
+    check_password_strength(password=new_password, user=user, field="new_password")
     user.set_password(new_password)
     user.save(update_fields=["password", "updated_at"])
-    logger.info("Password changed", extra={"user_id": str(user.pk)})
+    # Las otras sesiones se cierran; la vista abre una nueva para quien la cambió.
+    end_all_sessions(user=user)
+    logger.info("Sign-in credentials changed", extra={"user_id": str(user.pk)})
     return user
 
 

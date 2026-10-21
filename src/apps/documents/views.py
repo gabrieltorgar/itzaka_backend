@@ -8,19 +8,25 @@ from rest_framework.views import APIView
 
 from apps.documents.serializers import SendDocumentSerializer
 from apps.documents.services import send_document
+from apps.team.tenancy import account_of
 
 
 class SendDocumentView(APIView):
     """POST /api/documents/send/ — manda el PDF al correo de quien lo recibe."""
 
     permission_classes = [IsAuthenticated]
+    throttle_scope = "documents"
     # El PDF viaja como formulario: es un archivo, no un texto.
     parser_classes = [MultiPartParser, FormParser]
 
     def post(self, request: Request) -> Response:
         serializer = SendDocumentSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        sent = send_document(user=request.user, **serializer.validated_data)
+        sent = send_document(
+            user=request.user,
+            account=account_of(request),
+            **serializer.validated_data,
+        )
         return Response(
             {
                 "sent": sent,
