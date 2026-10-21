@@ -9,6 +9,7 @@ from datetime import timedelta
 from pathlib import Path
 
 import environ
+from corsheaders.defaults import default_headers
 
 # BASE_DIR = repo root (parents: settings.py -> core -> src -> repo)
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -292,6 +293,8 @@ OTP_TTL_MINUTES = env("OTP_TTL_MINUTES")
 CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOWED_ORIGINS = env("CORS_ALLOWED_ORIGINS")
 CORS_ALLOW_CREDENTIALS = True
+# La empresa en la que se trabaja viaja en su propia cabecera (iteracion-14).
+CORS_ALLOW_HEADERS = (*default_headers, "x-empresa")
 # La SPA escribe con la cookie de la sesión y su token CSRF: el origen de la
 # aplicación tiene que ser de confianza para la comprobación CSRF de Django.
 CSRF_TRUSTED_ORIGINS = list(dict.fromkeys(CSRF_TRUSTED_ORIGINS + CORS_ALLOWED_ORIGINS))

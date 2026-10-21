@@ -279,3 +279,10 @@ class TestColaboradorQueSeVa:
         assert not User.objects.filter(pk=colaborador.pk).exists()
         assert Client.objects.filter(owner=admin).count() == 2
         assert not Membership.objects.filter(account=admin).exists()
+
+
+class TestCabeceraPermitida:
+    """La cabecera X-Empresa pasa CORS si algún día se llama desde otro origen."""
+
+    def test_cors_lets_the_company_header_through(self, settings) -> None:
+        assert "x-empresa" in settings.CORS_ALLOW_HEADERS
