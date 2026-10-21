@@ -1,7 +1,8 @@
 """Accounts models: the account, its subscription and its letterhead.
 
-Each ``User`` is a tenant: all domain data (tariffs, clients, quotes,
-projects, payments) is scoped to the user that owns it. An account is its
+Each ``User`` who registers is a tenant —its company—: all domain data
+(tariffs, clients, quotes, projects, payments) is scoped to the user that owns
+it, and collaborators work on it through ``apps.team`` (iteracion-14). An account is its
 email: por ahí se entra, por ahí llega el código que la verifica y por ahí
 salen los comprobantes. El teléfono dejó de ser una forma de entrar —no había
 cómo mandarle un código— y el de los documentos es el de la organización.
@@ -51,6 +52,13 @@ class User(AbstractBaseUser, PermissionsMixin):
         verbose_name=_("correo por confirmar"),
     )
     is_active = models.BooleanField(default=True, verbose_name=_("activo"))
+    # Quien se registra trae su empresa; quien llega por una invitación sólo
+    # trabaja en las empresas que lo invitan (iteracion-14, US-136).
+    has_own_workspace = models.BooleanField(
+        default=True,
+        verbose_name=_("tiene empresa propia"),
+        help_text=_("Falso en las cuentas creadas desde una invitación."),
+    )
     is_staff = models.BooleanField(default=False, verbose_name=_("es staff"))
     created_at = models.DateTimeField(auto_now_add=True, verbose_name=_("creado en"))
     updated_at = models.DateTimeField(auto_now=True, verbose_name=_("actualizado en"))

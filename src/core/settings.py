@@ -97,6 +97,7 @@ INSTALLED_APPS = [
     "apps.assets",
     "apps.documents",
     "apps.legal",
+    "apps.team",
 ]
 
 MIDDLEWARE = [
@@ -194,6 +195,7 @@ REST_FRAMEWORK = {
         "password_reset": "5/hour",
         "contact": "5/hour",
         "documents": "30/hour",
+        "invitations": "30/hour",
     },
     # Detrás del proxy de Vercel, la dirección real es la del X-Forwarded-For.
     "NUM_PROXIES": env.int("NUM_PROXIES", default=1),
