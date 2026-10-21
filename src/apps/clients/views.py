@@ -6,6 +6,7 @@ from rest_framework.permissions import IsAuthenticated
 from apps.clients.selectors import list_clients_for_owner
 from apps.clients.serializers import ClientSerializer
 from apps.clients.services import delete_client
+from apps.team.tenancy import account_of
 
 
 class ClientViewSet(viewsets.ModelViewSet):
@@ -15,10 +16,10 @@ class ClientViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return list_clients_for_owner(owner=self.request.user)
+        return list_clients_for_owner(owner=account_of(self.request))
 
     def perform_create(self, serializer) -> None:
-        serializer.save(owner=self.request.user)
+        serializer.save(owner=account_of(self.request))
 
     def perform_destroy(self, instance) -> None:
         delete_client(client=instance)

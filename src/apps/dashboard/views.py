@@ -6,6 +6,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.dashboard.selectors import build_dashboard
+from apps.team.tenancy import account_of
 
 
 class DashboardView(APIView):
@@ -14,4 +15,4 @@ class DashboardView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request: Request) -> Response:
-        return Response(build_dashboard(owner=request.user))
+        return Response(build_dashboard(owner=account_of(request)))

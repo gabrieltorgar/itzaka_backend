@@ -5,6 +5,7 @@ from rest_framework import serializers
 from apps.accounts.models import HEX_COLOR_VALIDATOR, Organization, Subscription, User
 from apps.legal.serializers import AcceptanceSerializer
 from apps.legal.services import check_versions, status_for
+from apps.team.tenancy import companies_of
 from common.phones import PhoneField
 from common.validators import IMAGES, validate_upload
 
@@ -269,6 +270,7 @@ class MyAccountSerializer(serializers.ModelSerializer):
     subscription = SubscriptionSerializer(read_only=True)
     organization = OrganizationSerializer(read_only=True)
     legal = serializers.SerializerMethodField()
+    companies = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -281,8 +283,16 @@ class MyAccountSerializer(serializers.ModelSerializer):
             "created_at",
             "subscription",
             "organization",
+            "companies",
         ]
         read_only_fields = fields
+
+    def get_companies(self, obj: User) -> list[dict]:
+        """Las empresas donde trabaja, la propia primero (iteracion-14)."""
+        return [
+            {"id": str(c.account.pk), "name": c.name, "role": c.role}
+            for c in companies_of(obj)
+        ]
 
     def get_legal(self, obj: User) -> dict:
         """Qué documentos rigen, cuáles aceptó y si le falta aceptar alguno."""

@@ -117,6 +117,7 @@ def _rows(kind: str, reference: str, party: str, amount: str) -> list[tuple[str,
 def send_document(
     *,
     user,
+    account=None,
     kind: str,
     to: str,
     file,
@@ -126,6 +127,10 @@ def send_document(
     message: str = "",
 ) -> bool:
     """Manda el documento adjunto al correo indicado. Devuelve si salió.
+
+    Sale con la marca de la empresa (``account``; sin ella, la de ``user``) y
+    las respuestas le llegan a quien lo manda (``user``): en una empresa con
+    colaboradores no tienen por qué ser la misma persona (iteracion-14).
 
     Raises:
         ValidationError: el adjunto pesa de más, no es un PDF o no hay a quién
@@ -152,7 +157,7 @@ def send_document(
     )
 
     wording = WORDING[kind]
-    brand = brand_for(user=user)
+    brand = brand_for(user=account or user)
     html = render_email(
         brand=brand,
         title=wording["title"],

@@ -9,6 +9,7 @@ from datetime import timedelta
 from pathlib import Path
 
 import environ
+from corsheaders.defaults import default_headers
 
 # BASE_DIR = repo root (parents: settings.py -> core -> src -> repo)
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -97,6 +98,7 @@ INSTALLED_APPS = [
     "apps.assets",
     "apps.documents",
     "apps.legal",
+    "apps.team",
 ]
 
 MIDDLEWARE = [
@@ -194,6 +196,8 @@ REST_FRAMEWORK = {
         "password_reset": "5/hour",
         "contact": "5/hour",
         "documents": "30/hour",
+        "invitations": "30/hour",
+        "invitation": "30/min",
     },
     # Detrás del proxy de Vercel, la dirección real es la del X-Forwarded-For.
     "NUM_PROXIES": env.int("NUM_PROXIES", default=1),
@@ -263,7 +267,7 @@ DOCUMENT_EMAIL_MAX_BYTES = env.int("DOCUMENT_EMAIL_MAX_BYTES", default=8 * 1024 
 RESEND_API_KEY = env.str("RESEND_API_KEY", default="").strip()
 RESEND_FROM = env.str("RESEND_FROM", default="CUOTREKA <onboarding@resend.dev>").strip()
 # A dónde llevan los enlaces de los correos: la aplicación, no la API.
-APP_BASE_URL = env.str("APP_BASE_URL", default="https://presuplano.vercel.app")
+APP_BASE_URL = env.str("APP_BASE_URL", default="https://cuotreka.vercel.app")
 
 # Tope del documento de un plano. Una textura suelta y el plano de fondo
 # escaneado viajan dentro del JSON, que es lo que puede engordarlo.
@@ -289,6 +293,8 @@ OTP_TTL_MINUTES = env("OTP_TTL_MINUTES")
 CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOWED_ORIGINS = env("CORS_ALLOWED_ORIGINS")
 CORS_ALLOW_CREDENTIALS = True
+# La empresa en la que se trabaja viaja en su propia cabecera (iteracion-14).
+CORS_ALLOW_HEADERS = (*default_headers, "x-empresa")
 # La SPA escribe con la cookie de la sesión y su token CSRF: el origen de la
 # aplicación tiene que ser de confianza para la comprobación CSRF de Django.
 CSRF_TRUSTED_ORIGINS = list(dict.fromkeys(CSRF_TRUSTED_ORIGINS + CORS_ALLOWED_ORIGINS))

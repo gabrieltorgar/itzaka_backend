@@ -3,6 +3,50 @@
 Todas las notas de cambios relevantes de la API. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es-ES/) y versionado semántico.
 
+## [3.7.0] — 2026-10-21 · iteracion-14: colaboradores invitados
+
+### Added
+- **colaboradores — US-135 Invitar colaboradores por correo:** app `team` con
+  `Membership` (quién colabora en la empresa de quién, activo o no) e
+  `Invitation` (correo, huella SHA-256 del enlace, vigencia de 7 días).
+  `POST /api/collaborators/invitations/` recibe de 1 a 20 correos y manda a
+  cada uno, con la marca de la empresa, un enlace a `/invitacion/<token>`; no
+  invita dos veces a quien ya colabora o ya tiene una invitación vigente, y
+  dice por qué se saltó cada correo (límite de 30 por hora).
+- **colaboradores — US-136 Aceptar una invitación y crear mi cuenta:**
+  `GET /api/invitations/<token>/` (público) dice a qué empresa invita y si
+  sigue vigente; `POST /api/invitations/<token>/accept/` crea la cuenta ya
+  confirmada y sin empresa propia (`User.has_own_workspace`), o pide la
+  contraseña de quien ya tiene una, abre la sesión y dice a qué empresa se
+  entra. El enlace sirve una vez (vencida o cancelada 410, ya aceptada 409);
+  reCAPTCHA y campo trampa como el registro.
+- **colaboradores — US-137 Trabajar en las empresas que me invitan:** los datos
+  se acotan a la empresa en la que se trabaja (`apps/team/tenancy.py`,
+  `account_of(request)`): la cabecera `X-Empresa` la elige; sin ella, la propia
+  o la primera donde se colabora activo. Una empresa ajena o donde lo
+  desactivaron responde 403 con `code: company_access`. `/api/auth/me/` trae
+  `companies` (id, nombre y papel). Los documentos salen con la marca de la
+  empresa y las respuestas llegan a quien los manda.
+- **colaboradores — US-138 Gestionar a mis colaboradores:**
+  `GET /api/collaborators/` (con `?search=` y `?status=`) junta colaboradores
+  e invitaciones que esperan; `PATCH/DELETE /api/collaborators/members/<id>/`
+  activa, desactiva o quita de la empresa —lo registrado se queda y la cuenta
+  sigue siendo de la persona—.
+- **colaboradores — US-139 Reenviar o cancelar una invitación:**
+  `POST /api/collaborators/invitations/<id>/resend/` (enlace nuevo por 7 días;
+  el anterior deja de servir) y `…/cancel/`.
+
+### Changed
+- **organización — US-140 Lo que sólo el administrador decide:** cambiar la
+  organización (nombre, color, logotipo, contacto) e invitar o gestionar
+  colaboradores responden 403 a un colaborador (`IsCompanyAdmin`); ver la
+  organización sigue abierto. US-71, US-102 y US-118 cambian en lo mismo.
+- **cuenta — US-126:** un colaborador que elimina su cuenta no borra nada de
+  la empresa.
+- **CORS:** deja pasar la cabecera `X-Empresa`.
+
+---
+
 ## [3.6.0] — 2026-10-20 · iteracion-13: plataforma y convenciones (admin, teléfonos y capas)
 
 ### Changed

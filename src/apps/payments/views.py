@@ -18,6 +18,7 @@ from apps.payments.services import (
 )
 from apps.projects.models import Project
 from apps.projects.selectors import advanced_value, quoted_value
+from apps.team.tenancy import account_of
 
 
 class PaymentViewSet(viewsets.ReadOnlyModelViewSet):
@@ -28,11 +29,15 @@ class PaymentViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         project_id = self.request.query_params.get("project")
-        return list_payments_for_owner(owner=self.request.user, project_id=project_id)
+        return list_payments_for_owner(
+            owner=account_of(self.request), project_id=project_id
+        )
 
     def _get_project(self) -> Project:
         project_id = self.request.query_params.get("project")
-        project = get_owned_project(owner=self.request.user, project_id=project_id)
+        project = get_owned_project(
+            owner=account_of(self.request), project_id=project_id
+        )
         if project is None:
             raise NotFound("Proyecto no encontrado.")
         return project
@@ -42,13 +47,17 @@ class PaymentViewSet(viewsets.ReadOnlyModelViewSet):
             data=request.data, context={"request": request}
         )
         serializer.is_valid(raise_exception=True)
-        payment = register_payment(owner=request.user, **serializer.validated_data)
+        payment = register_payment(
+            owner=account_of(request), **serializer.validated_data
+        )
         return Response(PaymentSerializer(payment).data, status=status.HTTP_201_CREATED)
 
     @action(detail=False, methods=["get"])
     def summary(self, request: Request) -> Response:
         project = self._get_project()
-        payments = list_payments_for_owner(owner=request.user, project_id=project.id)
+        payments = list_payments_for_owner(
+            owner=account_of(request), project_id=project.id
+        )
         return Response(
             {
                 "advanced_value": advanced_value(project),
