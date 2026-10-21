@@ -115,6 +115,17 @@ class TestCrearLaCuenta:
         assert "cuotreka_access" in response.cookies
         assert response.data["user"]["email"] == "ana@estudio.mx"
 
+    def test_it_says_which_company_to_enter(self, api_client, invitacion) -> None:
+        """Entra a ella: la aplicación sabe a qué empresa acaba de sumarse."""
+        response = api_client.post(
+            aceptar("enlace-ana"), {"password": PASSWORD, **accepted()}, format="json"
+        )
+
+        assert response.data["company"] == {
+            "id": str(invitacion.account.id),
+            "name": "Estudio Reyes",
+        }
+
     def test_no_company_of_its_own_is_created(self, api_client, invitacion) -> None:
         api_client.post(
             aceptar("enlace-ana"), {"password": PASSWORD, **accepted()}, format="json"

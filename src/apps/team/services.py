@@ -176,6 +176,14 @@ def _ensure_usable(invitation: Invitation) -> None:
         )
 
 
+@dataclass
+class Accepted:
+    """Quién entró y a qué empresa se sumó."""
+
+    user: User
+    account: User
+
+
 @transaction.atomic
 def accept_invitation(
     *,
@@ -185,7 +193,7 @@ def accept_invitation(
     privacy_version: str = "",
     ip_address: str | None = None,
     user_agent: str = "",
-) -> User:
+) -> Accepted:
     """Sumar a la empresa a quien recibió el enlace.
 
     Sin cuenta, la crea ya confirmada —el enlace llegó a ese correo— y sin
@@ -242,7 +250,7 @@ def accept_invitation(
         "Invitation accepted",
         extra={"user_id": str(user.pk), "account_id": str(invitation.account_id)},
     )
-    return user
+    return Accepted(user=user, account=invitation.account)
 
 
 def _owned_member(*, account: User, member_id) -> Membership:

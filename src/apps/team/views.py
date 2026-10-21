@@ -115,16 +115,24 @@ class InvitationAcceptView(APIView):
 
         serializer = AcceptInvitationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        user = accept_invitation(
+        accepted = accept_invitation(
             token=token,
             ip_address=client_ip(request),
             user_agent=request.META.get("HTTP_USER_AGENT", ""),
             **serializer.validated_data,
         )
         response = Response(
-            {"user": UserAccountSerializer(user).data}, status=status.HTTP_201_CREATED
+            {
+                "user": UserAccountSerializer(accepted.user).data,
+                # A esta empresa entra: la aplicación la deja elegida.
+                "company": {
+                    "id": str(accepted.account.pk),
+                    "name": company_name(account=accepted.account),
+                },
+            },
+            status=status.HTTP_201_CREATED,
         )
-        set_session_cookies(response, start_session(user=user))
+        set_session_cookies(response, start_session(user=accepted.user))
         get_token(request)
         return response
 
