@@ -29,6 +29,7 @@ from apps.projects.services import (
     start_project,
     update_progress,
 )
+from apps.team.tenancy import account_of
 
 
 class ProjectViewSet(viewsets.ReadOnlyModelViewSet):
@@ -38,7 +39,7 @@ class ProjectViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return list_projects_for_owner(owner=self.request.user)
+        return list_projects_for_owner(owner=account_of(self.request))
 
     def create(self, request: Request, *args, **kwargs) -> Response:
         serializer = StartProjectSerializer(
@@ -46,7 +47,7 @@ class ProjectViewSet(viewsets.ReadOnlyModelViewSet):
         )
         serializer.is_valid(raise_exception=True)
         project = start_project(
-            owner=request.user, quote=serializer.validated_data["quote"]
+            owner=account_of(request), quote=serializer.validated_data["quote"]
         )
         return Response(ProjectSerializer(project).data, status=status.HTTP_201_CREATED)
 
@@ -83,7 +84,7 @@ class ProgressViewSet(viewsets.ReadOnlyModelViewSet):
     parser_classes = [JSONParser, MultiPartParser, FormParser]
 
     def get_queryset(self):
-        return progresses_for_owner(owner=self.request.user)
+        return progresses_for_owner(owner=account_of(self.request))
 
     def partial_update(self, request: Request, pk: str | None = None) -> Response:
         progress = self.get_object()
@@ -121,7 +122,7 @@ class EvidenceViewSet(mixins.DestroyModelMixin, viewsets.GenericViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return evidences_for_owner(owner=self.request.user)
+        return evidences_for_owner(owner=account_of(self.request))
 
     def perform_destroy(self, instance) -> None:
         delete_evidence(evidence=instance)

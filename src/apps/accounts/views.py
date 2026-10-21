@@ -48,6 +48,7 @@ from apps.accounts.services import (
     verify_account,
 )
 from apps.legal.services import client_ip
+from apps.team.tenancy import account_of
 from common.auth_cookies import (
     REFRESH_COOKIE,
     clear_session_cookies,
@@ -361,11 +362,12 @@ class MyOrganizationView(APIView):
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def get(self, request: Request) -> Response:
-        organization = get_my_organization(user=request.user)
+        # La de la empresa en la que se trabaja (iteracion-14).
+        organization = get_my_organization(user=account_of(request))
         return Response(OrganizationSerializer(organization).data)
 
     def patch(self, request: Request) -> Response:
-        organization = get_my_organization(user=request.user)
+        organization = get_my_organization(user=account_of(request))
         serializer = OrganizationSerializer(
             organization, data=request.data, partial=True
         )
@@ -385,4 +387,6 @@ class MyOrganizationLogoView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request: Request) -> Response:
-        return Response({"data_url": organization_logo_data_url(user=request.user)})
+        return Response(
+            {"data_url": organization_logo_data_url(user=account_of(request))}
+        )

@@ -2,6 +2,8 @@
 
 from rest_framework import serializers
 
+from apps.team.tenancy import account_of
+
 
 class OwnedPrimaryKeyRelatedField(serializers.PrimaryKeyRelatedField):
     """Un id que sólo encuentra registros de la cuenta de quien escribe.
@@ -12,7 +14,8 @@ class OwnedPrimaryKeyRelatedField(serializers.PrimaryKeyRelatedField):
     la primera barrera, no la única.
 
     Necesita la petición en el contexto del serializer; sin ella no encuentra
-    nada.
+    nada. La cuenta es la de la empresa en la que se trabaja (iteracion-14): un
+    colaborador encuentra los registros de la empresa, no los suyos.
     """
 
     def __init__(self, *, owner_field: str = "owner", not_found: str, **kwargs):
@@ -28,4 +31,4 @@ class OwnedPrimaryKeyRelatedField(serializers.PrimaryKeyRelatedField):
         user = getattr(request, "user", None)
         if user is None or not user.is_authenticated:
             return queryset.none()
-        return queryset.filter(**{self.owner_field: user})
+        return queryset.filter(**{self.owner_field: account_of(request)})
