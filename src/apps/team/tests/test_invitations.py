@@ -304,3 +304,29 @@ class TestEnlaceDeLaMarca:
         )
 
         assert salida.stdout.strip() == "https://cuotreka.vercel.app"
+
+
+@pytest.mark.django_db
+class TestDosEnviosAlMismoTiempo:
+    """Bug iteracion-16 - Dos envíos al mismo tiempo, sin error del sistema."""
+
+    def test_the_second_one_says_it_is_already_pending(
+        self, authenticated_client, user, correo, mocker
+    ) -> None:
+        # La otra petición ya guardó la invitación, pero ésta no alcanzó a verla.
+        InvitationFactory(account=user, email="ana@estudio.mx")
+        mocker.patch("apps.team.services.pending_invitation", return_value=None)
+
+        response = authenticated_client.post(
+            URL, {"emails": ["ana@estudio.mx"]}, format="json"
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["skipped"] == [
+            {
+                "email": "ana@estudio.mx",
+                "reason": "Ya tiene una invitación pendiente; puedes reenviarla.",
+            }
+        ]
+        assert Invitation.objects.filter(account=user).count() == 1
+        correo.assert_not_called()

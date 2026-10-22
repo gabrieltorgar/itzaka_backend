@@ -37,6 +37,18 @@ Todas las notas de cambios relevantes de la API. El formato sigue
   (`mail.send_batch`, el endpoint de tandas de Resend) y en la misma
   transacción que las invitaciones: un corte no deja ninguna pendiente sin su
   correo.
+- **colaboradores — US-136 El campo trampa lleno no deja una sesión a medias
+  (gravedad baja):** la aceptación que el campo trampa descarta respondía sin
+  `company`, y la aplicación fallaba después de guardar una sesión falsa.
+  Ahora responde con la misma forma que una aceptación de verdad —la persona y
+  la empresa a la que se entra—, sin cuenta ni sesión detrás.
+- **API — US-135 · US-136 Dos peticiones al mismo tiempo no terminan en 500
+  (gravedad baja):** una restricción única que choca entre dos peticiones
+  responde 409 con qué hacer (`code: conflict`), sin el mensaje de la base.
+  Invitar a la vez el mismo correo deja una sola invitación y la otra dice que
+  ya está pendiente; aceptar a la vez dos invitaciones al mismo correo nuevo
+  crea una cuenta y la otra pide entrar con su contraseña (409
+  `account_exists`).
 
 ---
 
