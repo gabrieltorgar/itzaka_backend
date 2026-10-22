@@ -20,7 +20,7 @@ botocore==1.43.114
     # via
     #   boto3
     #   s3transfer
-django==5.2.18
+django==6.1.2
     # via
     #   django-cors-headers
     #   django-csp
