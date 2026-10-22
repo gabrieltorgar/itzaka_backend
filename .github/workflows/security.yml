@@ -25,7 +25,7 @@ jobs:
         if: hashFiles('pyproject.toml') != ''
       - uses: pnpm/action-setup@v6
         if: hashFiles('pnpm-lock.yaml') != ''
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         if: hashFiles('pnpm-lock.yaml') != ''
         with: { node-version: 22, cache: pnpm }
       - name: Dependencias vulnerables
