@@ -3,6 +3,19 @@
 Todas las notas de cambios relevantes de la API. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es-ES/) y versionado semántico.
 
+## [Unreleased] — iteracion-16
+
+### Added
+- **repositorio — TEC Archivos de trabajo del repositorio:** guía de
+  desarrollo para personas y agentes (`.claude/CLAUDE.md`), reglas de
+  contribución y del stack (`.claude/rules/`), `AGENTS.md` y `CONTRIBUTING.md`.
+  El README adopta el formato de la casa —bloques generados de versión, stack,
+  variables, comandos, quality gate, estructura, despliegue y contribución— y
+  suma las secciones de módulos, autenticación y sesión, integraciones y
+  administración, sin borrar el texto que ya tenía.
+
+---
+
 ## [3.7.1] — 2026-10-21 · iteracion-15: documentos legales en producción
 
 ### Fixed

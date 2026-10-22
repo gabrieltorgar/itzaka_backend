@@ -7,7 +7,70 @@ API del cotizador para arquitectos **CUOTREKA**. Permite registrar tarifas
 avances de proyecto con evidencia fotográfica, y pagos (totales o parciales)
 con su comprobante, hasta el cierre del proyecto con documento resumen.
 
+## Módulos
+
+- **Cuenta y acceso:** registro con correo y contraseña confirmado con un código,
+  acceso, recuperación de contraseña, cambio de correo, suscripción y
+  eliminación de la cuenta.
+- **Catálogo, clientes y cotizaciones:** servicios con su unidad y precio,
+  clientes y cotizaciones con total automático, con su documento PDF que se
+  descarga o se envía por correo.
+- **Proyectos, avances y cierre:** una cotización se vuelve proyecto; los avances
+  se registran por cantidad con evidencia fotográfica y el cierre entrega su
+  documento resumen.
+- **Cobros y personal:** pagos totales o parciales con comprobante y saldo, y el
+  personal que ejecuta la obra con lo que se le paga.
+- **Planos 2D y 3D:** los planos de cada empresa con su biblioteca de modelos y
+  texturas, la foto de un plano en papel convertida en plano editable y la
+  cotización que sale del plano.
+- **Inicio:** el resumen de la cuenta: obras en curso, lo cotizado y lo cobrado.
+- **Colaboradores:** el administrador invita por correo; cada persona trabaja en
+  las empresas que la invitan y sólo el administrador decide la organización.
+
+## Estado
+
+<!-- readme:auto:version -->
+
+**Versión:** 3.7.1 — `pyproject.toml` · historial en [CHANGELOG.md](CHANGELOG.md)
+
+<!-- /readme:auto:version -->
+
+<!-- readme:auto:entornos -->
+
+Pendiente: `python3 scripts/readme_sync.py --write --kind backend --docs <memoria>` llena esta tabla desde `estado/proyecto.json` de la memoria del proyecto.
+
+<!-- /readme:auto:entornos -->
+
 ## Stack
+
+<!-- readme:auto:stack -->
+
+| Paquete | Versión declarada |
+|---|---|
+| `anthropic` | `>=1,<2` |
+| `boto3` | `>=1.35,<2` |
+| `django` | `>=5.2,<6.2` |
+| `django-cors-headers` | `>=4.4,<5` |
+| `django-csp` | `>=4,<5` |
+| `django-environ` | `>=0.11,<0.15` |
+| `django-filter` | `>=24.3,<27` |
+| `django-phonenumber-field[phonenumbers]` | `>=8,<9` |
+| `django-storages[s3]` | `>=1.14,<2` |
+| `django-unfold` | `>=0.110,<0.111` |
+| `djangorestframework` | `>=3.17.2,<3.19` |
+| `djangorestframework-simplejwt` | `>=5.3,<6` |
+| `filetype` | `>=1.2.0` |
+| `numpy` | `>=2,<3` |
+| `opencv-python-headless` | `>=4.10,<6` |
+| `pillow` | `>=13,<14` |
+| `psycopg[binary]` | `>=3.2,<4` |
+| `whitenoise` | `>=6.7,<7` |
+
+Desarrollo y pruebas (`dev`): `factory-boy`, `pytest`, `pytest-cov`, `pytest-django`, `pytest-mock`, `ruff`.
+
+Fuente: `pyproject.toml`; versiones exactas en `uv.lock`.
+
+<!-- /readme:auto:stack -->
 
 - **Django 5.2 + Django REST Framework**
 - **PostgreSQL** (Neon en la nube, por entorno)
@@ -15,13 +78,280 @@ con su comprobante, hasta el cierre del proyecto con documento resumen.
 - Lint/format con **ruff**
 - Testing con **pytest** (TDD estricto: RED → GREEN por user story)
 
+## Requisitos
+
+<!-- readme:auto:requisitos -->
+
+- Python `>=3.12` (`requires-python`)
+- [uv](https://docs.astral.sh/uv/): entorno y dependencias
+- PostgreSQL accesible por `DATABASE_URL`
+- Git
+
+<!-- /readme:auto:requisitos -->
+
+## Puesta en marcha
+
+<!-- readme:auto:puesta-en-marcha -->
+
+1. Clona el repositorio y entra en su carpeta.
+2. Instala las dependencias (runtime, desarrollo y pruebas) desde `uv.lock`: `uv sync --locked --all-groups`
+3. Copia las variables y complétalas con los valores del equipo (`src/core/.env` nunca se commitea): `cp src/core/.env.example src/core/.env` — `DATABASE_URL` apunta a tu PostgreSQL local
+4. Aplica las migraciones: `uv run python src/manage.py migrate`
+5. Crea la tabla de caché (throttling): `uv run python src/manage.py createcachetable`
+6. Crea un superusuario para el admin: `uv run python src/manage.py createsuperuser`
+7. Levanta el servidor: `uv run python src/manage.py runserver` → http://localhost:8000 (admin en `/admin/`)
+
+<!-- /readme:auto:puesta-en-marcha -->
+
+## Variables de entorno
+
+<!-- readme:auto:variables -->
+
+Archivo: `src/core/.env.example` → cópialo a `src/core/.env`. Aquí solo van los nombres: los valores nunca se escriben en el README ni se commitean.
+
+| Variable | Descripción |
+|---|---|
+| `DEBUG` | — |
+| `SECRET_KEY` | — |
+| `ALLOWED_HOSTS` | — |
+| `CORS_ALLOWED_ORIGINS` | — |
+| `DATABASE_URL` | — |
+| `LOG_DIR` | — |
+| `OTP_UNIVERSAL_CODE` | — |
+| `OTP_UNIVERSAL_CODE_ENABLED` | Only opens accounts while mail is not configured, and only where enabled: on by default with DEBUG, off in production unless set on purpose. |
+| `OTP_TTL_MINUTES` | — |
+| `OTP_MAX_ATTEMPTS` | Failed tries a code survives before it is voided. |
+| `RECAPTCHA_SECRET_KEY` | Verification turns on with the secret key (RECAPTCHA_ENABLED follows it). The site key goes to the frontend as VITE_RECAPTCHA_SITE_KEY: set both. |
+| `RECAPTCHA_MIN_SCORE` | — |
+| `RECAPTCHA_HOSTNAMES` | — |
+| `THROTTLE_ANON` | Run `uv run python src/manage.py createcachetable` once after migrating. |
+| `THROTTLE_USER` | — |
+| `NUM_PROXIES` | Proxies in front of Django (Vercel = 1), so limits key on the client IP. |
+| `R2_ACCOUNT_ID` | — |
+| `R2_ACCESS_KEY_ID` | — |
+| `R2_SECRET_ACCESS_KEY` | — |
+| `R2_BUCKET_NAME` | — |
+| `R2_ENDPOINT_URL` | Optional: defaults to https://<account_id>.r2.cloudflarestorage.com |
+| `R2_PUBLIC_URL` | Public host that serves the objects (r2.dev subdomain or your custom domain) |
+| `R2_SIGNED_URLS` | Private bucket: signed URLs that expire, from the S3 endpoint (not the public host). Turn on after making the bucket private and allowing the app's origin in the bucket's CORS policy (the 3D editor fetches textures and meshes). |
+| `R2_SIGNED_URL_SECONDS` | — |
+
+<!-- /readme:auto:variables -->
+
+## Comandos
+
+<!-- readme:auto:comandos -->
+
+| Comando | Para qué |
+|---|---|
+| `uv run python src/manage.py runserver` | Servidor de desarrollo |
+| `uv run python src/manage.py makemigrations` | Crea migraciones tras cambiar modelos |
+| `uv run python src/manage.py migrate` | Aplica las migraciones |
+| `uv run pytest` | Pruebas (con cobertura: ver Pruebas y quality gate) |
+| `uv run ruff format .` | Formato |
+| `uv run ruff check .` | Lint (`--fix` corrige) |
+| `uv add <paquete>` | Agrega una dependencia de runtime (`--group dev` para desarrollo) |
+
+<!-- /readme:auto:comandos -->
+
+## Pruebas y quality gate
+
+<!-- readme:auto:pruebas -->
+
+Pasos de `quality-gate` (`.github/workflows/quality-gate.yml`), en orden; los mismos comandos sirven en local (con el valor de `MIN_COVERAGE` ya puesto):
+
+1. `uv sync --all-groups`
+2. `mkdir -p reports`
+3. Pruebas con cobertura (el resultado lo decide el gate): `uv run pytest --junitxml=reports/junit.xml --cov --cov-report=xml:reports/coverage.xml --cov-report=term`
+4. Quality gate: `python3 scripts/test_gate.py --junit reports/junit.xml --cobertura reports/coverage.xml --min 0.90`
+
+Cobertura mínima: **90 %** (`MIN_COVERAGE` del workflow). Una prueba en rojo, una omitida sin motivo permitido o una cobertura menor bloquean el merge.
+
+| Workflow | Check | Obligatorio en `main` y `develop` |
+|---|---|---|
+| `.github/workflows/ci.yml` | `test-backend` | no |
+| `.github/workflows/quality-gate.yml` | `quality-gate` | sí |
+| `.github/workflows/security.yml` | `security` | sí |
+
+<!-- /readme:auto:pruebas -->
+
 ## Estructura de ramas
+
+<!-- readme:auto:estructura -->
+
+| Ruta | Contenido |
+|---|---|
+| `src/api/` | URLs raíz de la API (incluye las de cada app) |
+| `src/apps/` | Apps de dominio (tabla abajo) |
+| `src/common/` | Código compartido: modelos abstractos, permisos, paginación, filtros, acciones masivas, errores |
+| `src/core/` | Settings, URLs, WSGI/ASGI y middleware |
+| `src/tests/` | Pruebas de plataforma (línea base) |
+| `scripts/` | Scripts vendorizados (quality gate, README) y de build |
+| `.github/workflows/` | CI |
+
+| App | Nombre (`verbose_name`) |
+|---|---|
+| `apps.accounts` | Cuentas |
+| `apps.assets` | Archivos del editor |
+| `apps.catalog` | Catálogo |
+| `apps.clients` | Clientes |
+| `apps.dashboard` | Inicio |
+| `apps.documents` | Documentos |
+| `apps.leads` | contactos |
+| `apps.legal` | documentos legales |
+| `apps.payments` | Pagos |
+| `apps.planner` | Planos |
+| `apps.projects` | Proyectos |
+| `apps.quotes` | Cotizaciones |
+| `apps.staff` | Personal |
+| `apps.team` | Colaboradores |
+
+<!-- /readme:auto:estructura -->
 
 - `main` → producción.
 - `develop` → integración (protegida: sólo pull requests con pruebas en verde y
   cobertura ≥ 90 %).
 - `iteracion-N` → rama de trabajo de cada iteración, que entra a `develop` por
   pull request.
+
+## API
+
+<!-- readme:auto:api -->
+
+Pendiente: la tabla sale de `uv run python src/manage.py api_routes --format md` (django-backend-conventions) al correr `readme_sync.py --write` con Django instalado.
+
+<!-- /readme:auto:api -->
+
+## Autenticación y sesión
+
+- Web: sesión con JWT en cookies `HttpOnly` que emite la API
+  (`POST /api/auth/login/`; `POST /api/auth/refresh/` rota el refresh y el
+  anterior queda en la lista negra; `POST /api/auth/logout/`). Django pone la
+  cookie `csrftoken` y cada escritura lleva la cabecera `X-CSRFToken`. El
+  navegador nunca lee ni envía tokens: no hay `Authorization: Bearer` para la
+  web, y la aplicación llama a la API por su propio dominio (`/api/*`).
+- Registro con correo y contraseña; la cuenta se confirma con un código de 6
+  dígitos que llega por correo (`/api/auth/verify-otp/`, `/api/auth/resend-otp/`).
+  La contraseña se recupera también con un código.
+- Colaboradores: entran por el enlace de su invitación
+  (`/api/invitations/<token>/accept/`), que crea la cuenta ya confirmada o pide la
+  contraseña de quien ya tiene una.
+- Empresa activa: la cabecera `X-Empresa` (el id de la cuenta de su
+  administrador); sin ella, la propia o la primera donde se colabora. Sin acceso
+  a la pedida, 403 con `code: company_access`.
+- Formularios públicos (registro, acceso, recuperación, contacto e invitación):
+  reCAPTCHA v3 verificado en el servidor y campo trampa.
+- Sin app móvil: no hay rutas `/api/auth/mobile/`.
+
+## Integraciones
+
+### Correo — Resend
+
+Los códigos de verificación, las invitaciones y los documentos salen por la API
+HTTP de Resend (`common/mail.py`).
+
+| Variable | Uso |
+|---|---|
+| `RESEND_API_KEY` | Llave de la API; sin ella no sale ningún correo |
+| `RESEND_FROM` | Remitente de un dominio verificado en Resend; el de prueba (`onboarding@resend.dev`) sólo entrega al dueño de la cuenta |
+| `APP_BASE_URL` | Dominio de la aplicación en los enlaces de los correos |
+| `DOCUMENT_EMAIL_MAX_BYTES` | Tope del PDF que viaja adjunto |
+
+### Archivos — Cloudflare R2
+
+Logotipos, evidencia de los avances y las texturas y modelos del editor, por
+`django-storages` (`core/settings_storages.py`).
+
+| Variable | Uso |
+|---|---|
+| `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME` | Cuenta, credenciales y bucket; con las cuatro se activa R2 |
+| `R2_ENDPOINT_URL`, `R2_PUBLIC_URL` | Endpoint S3 y host público de los objetos |
+| `R2_SIGNED_URLS`, `R2_SIGNED_URL_SECONDS` | URLs firmadas que vencen, para un bucket privado |
+| `USE_R2` | Fuerza R2 encendido o apagado |
+
+### IA — Anthropic
+
+La foto de un plano en papel se convierte en un plano editable
+(`apps/planner/photo_conversion.py`).
+
+| Variable | Uso |
+|---|---|
+| `ANTHROPIC_API_KEY` | Llave de la API |
+| `PHOTO_PLAN_MODEL` | Modelo que lee la foto |
+| `PHOTO_PLAN_DAILY_LIMIT` | Conversiones por cuenta al día |
+| `PHOTO_PLAN_MAX_BYTES` | Tope de la foto |
+
+### reCAPTCHA v3 — Google
+
+Verificación de los formularios públicos en el servidor (`common/recaptcha.py`).
+
+| Variable | Uso |
+|---|---|
+| `RECAPTCHA_SECRET_KEY` | Llave secreta; con ella se enciende la verificación |
+| `RECAPTCHA_MIN_SCORE` | Puntaje mínimo |
+| `RECAPTCHA_HOSTNAMES` | Dominios desde los que se aceptan los tokens |
+
+### Base de datos — Neon
+
+PostgreSQL de Neon por entorno, en `DATABASE_URL`.
+
+## Administración
+
+- Panel en `/admin/` del dominio de la API (Django Unfold); cada modelo de
+  `apps/` tiene su registro.
+- Acceso: sólo el equipo de CUOTREKA, con un superusuario creado con
+  `createsuperuser`; las cuentas de los clientes y sus colaboradores no entran
+  al admin. Las credenciales nunca viven en el repositorio ni en este README.
+
+## Despliegue
+
+<!-- readme:auto:despliegue -->
+
+Vercel (`vercel.json`):
+
+- Despliegan: `develop`, `main` (el resto de las ramas no despliega) — `git.deploymentEnabled`.
+- Build, en orden:
+  1. `uv sync --frozen --no-dev`
+  2. `uv run --no-sync python src/manage.py migrate --noinput`
+  3. `uv run --no-sync python src/manage.py createcachetable`
+- Función: `wsgi.py` con `excludeFiles`.
+
+<!-- /readme:auto:despliegue -->
+
+- Producción: https://api-presuplano.vercel.app (admin en `/admin/`); la
+  aplicación la llama por su propio dominio, https://cuotreka.vercel.app/api/.
+- Las variables por entorno (sólo nombres) viven en `tecnico/infraestructura.md`
+  de la memoria del proyecto, que es privada.
+- Verificación después de desplegar: `/api/health/` responde 200 y
+  `/admin/login/` carga con sus estilos.
+
+## Documentación
+
+<!-- readme:auto:documentacion -->
+
+- [CHANGELOG.md](CHANGELOG.md) — historial de versiones
+- [.claude/CLAUDE.md](.claude/CLAUDE.md) — guía de desarrollo para personas y agentes
+- [.claude/rules/contribucion.md](.claude/rules/contribucion.md) — reglas de contribución
+- [.claude/rules/backend.md](.claude/rules/backend.md) — reglas del stack
+- [CONTRIBUTING.md](CONTRIBUTING.md) — cómo contribuir (personas y GitHub)
+- [AGENTS.md](AGENTS.md) — punto de entrada para otros agentes
+- Memoria del proyecto `<proyecto>_docs`: producto, backlog, marca y prototipo en su sitio de documentación (enlace en [Estado](#estado) cuando se publica); infraestructura, despliegue y decisiones en `tecnico/` (privado).
+
+<!-- /readme:auto:documentacion -->
+
+## Contribución
+
+<!-- readme:auto:contribucion -->
+
+Este repositorio sigue el flujo de entrega del equipo. Reglas completas en [.claude/rules/contribucion.md](.claude/rules/contribucion.md) (para personas: [CONTRIBUTING.md](CONTRIBUTING.md)).
+
+- `main` (producción) y `develop` (integración) están protegidas: nadie sube directo; todo entra por pull request.
+- Se trabaja en `epica/EP-XX-<slug>` (primer flujo) o en `iteracion-N` (iteraciones), ramas creadas desde `develop`.
+- Un commit por historia o item (`US-XX <nombre>` o `TEC <título>`) con el código, sus pruebas, la entrada del CHANGELOG y este README al día.
+- El pull request a `develop` se integra solo con `quality-gate` (pruebas en verde y cobertura ≥ 90 %) y `security` en verde; los archivos del gate cambian solo como item `TEC` propio.
+- ¿Un cambio fuera del flujo? Abre un issue o pide un item: nunca un push directo, un force-push ni secretos en el repositorio.
+
+<!-- /readme:auto:contribucion -->
 
 ## Desarrollo
 
@@ -35,3 +365,7 @@ era `DEPLOY.md` (`legado/backend/DEPLOY.md`). Variables de entorno: ver
 
 > El scaffold del proyecto Django se genera al iniciar el desarrollo, tras la
 > aprobación del backlog (GATE 1).
+
+## Licencia
+
+<!-- COMPLETA: la licencia que acordó el cliente (p. ej. "Software privado y confidencial de <cliente>; todos los derechos reservados."). -->

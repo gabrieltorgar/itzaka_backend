@@ -50,3 +50,7 @@ coverage.xml
 
 # Quality gate
 reports/
+
+# Archivos personales de agentes: nunca se commitean (git-deploy-ops, agent_files.py)
+CLAUDE.local.md
+.claude/settings.local.json
