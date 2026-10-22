@@ -37,7 +37,7 @@ django-csp==4.0
     # via presuplano-backend
 django-environ==0.14.0
     # via presuplano-backend
-django-filter==25.2
+django-filter==26.2
     # via presuplano-backend
 django-phonenumber-field==8.5.0
     # via presuplano-backend
