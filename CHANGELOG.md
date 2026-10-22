@@ -14,6 +14,15 @@ Todas las notas de cambios relevantes de la API. El formato sigue
   suma las secciones de módulos, autenticación y sesión, integraciones y
   administración, sin borrar el texto que ya tenía.
 
+### Fixed
+- **colaboradores — US-139 Reenviar sin dejar a la persona sin enlace
+  (gravedad media-alta):** el reenvío cambiaba el enlace antes de mandar el
+  correo; si el correo fallaba, el enlace anterior ya no servía y el nuevo no
+  llegaba. Ahora el enlace nuevo reemplaza al anterior sólo cuando el correo
+  salió: si no sale, `POST /api/collaborators/invitations/<id>/resend/` responde
+  503 con `code: email_not_sent` y la invitación queda como estaba. La
+  respuesta dice si el correo salió (`email_sent`).
+
 ---
 
 ## [3.7.1] — 2026-10-21 · iteracion-15: documentos legales en producción

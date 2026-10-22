@@ -176,7 +176,11 @@ class MemberView(APIView):
 
 
 class InvitationResendView(APIView):
-    """POST /api/collaborators/invitations/<id>/resend/ — enlace nuevo (US-139)."""
+    """POST /api/collaborators/invitations/<id>/resend/ — enlace nuevo (US-139).
+
+    Responde la fila con ``email_sent``; si el correo no sale, 503 con
+    ``code: email_not_sent`` y el enlace anterior sigue sirviendo.
+    """
 
     permission_classes = [IsAuthenticated, IsCompanyAdmin]
     throttle_scope = "invitations"
@@ -185,7 +189,8 @@ class InvitationResendView(APIView):
         sent = resend_invitation(
             account=account_of(request), invitation_id=invitation_id
         )
-        return Response(TeamRowSerializer(invitation_row(sent.invitation)).data)
+        row = TeamRowSerializer(invitation_row(sent.invitation)).data
+        return Response({**row, "email_sent": sent.email_sent})
 
 
 class InvitationCancelView(APIView):

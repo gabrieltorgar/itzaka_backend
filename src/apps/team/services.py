@@ -307,14 +307,44 @@ def _owned_waiting_invitation(*, account: User, invitation_id) -> Invitation:
     return invitation
 
 
+class EmailNotSent(APIException):
+    """El correo no salió y nada cambió: el enlace anterior sigue sirviendo."""
+
+    status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+    default_code = "email_not_sent"
+
+    def __init__(self) -> None:
+        super().__init__(
+            {
+                "detail": (
+                    "No pudimos enviar el correo. El enlace anterior sigue "
+                    "sirviendo; intenta de nuevo en un momento."
+                ),
+                "code": "email_not_sent",
+            }
+        )
+
+
 def resend_invitation(*, account: User, invitation_id) -> Sent:
     """Reenviar una invitación pendiente o vencida (US-139).
 
-    Sale con un enlace nuevo que vale 7 días; el anterior deja de servir.
+    Sale con un enlace nuevo que vale 7 días, y el anterior deja de servir sólo
+    cuando el correo salió: si no sale, la persona se queda con el enlace que ya
+    tenía en vez de quedarse sin ninguno (iteracion-16).
+
+    Raises:
+        EmailNotSent: el correo no salió; la invitación quedó como estaba.
     """
     invitation = _owned_waiting_invitation(account=account, invitation_id=invitation_id)
-    token = _refresh_link(invitation)
-    return _send(invitation, token)
+    token, token_hash = _new_link()
+    sent = _send(invitation, token)
+    if not sent.email_sent:
+        raise EmailNotSent()
+    invitation.token_hash = token_hash
+    invitation.sent_at = timezone.now()
+    invitation.expires_at = invitation.sent_at + timedelta(days=INVITATION_DAYS)
+    invitation.save(update_fields=["token_hash", "sent_at", "expires_at"])
+    return sent
 
 
 def cancel_invitation(*, account: User, invitation_id) -> None:
