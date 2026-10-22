@@ -24,7 +24,7 @@ jobs:
       DATABASE_URL: postgres://postgres:postgres@localhost:5432/test
       MIN_COVERAGE: "0.90"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v5
       - run: uv sync --all-groups
       - run: mkdir -p reports
