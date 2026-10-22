@@ -8,3 +8,7 @@ class AccountsConfig(AppConfig):
     name = "apps.accounts"
     label = "accounts"
     verbose_name = "Cuentas"
+
+    def ready(self) -> None:
+        # Los chequeos de arranque viven en common; se registran al importarse.
+        from common import checks  # noqa: F401

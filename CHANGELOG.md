@@ -22,6 +22,21 @@ Todas las notas de cambios relevantes de la API. El formato sigue
   salió: si no sale, `POST /api/collaborators/invitations/<id>/resend/` responde
   503 con `code: email_not_sent` y la invitación queda como estaba. La
   respuesta dice si el correo salió (`email_sent`).
+- **correo — US-135 Producción no sale sin correo (gravedad media):** sin
+  `RESEND_API_KEY`, o con el remitente de prueba de Resend, los códigos, las
+  invitaciones y los documentos no le llegaban a nadie y sólo quedaba un aviso
+  en el registro. Ahora `common/checks.py` (corre con `migrate`, parte del
+  build) detiene el despliegue de producción y la versión anterior sigue
+  atendiendo; un correo que no puede salir queda como error. Encendido por
+  omisión con `VERCEL_ENV=production` (`REQUIRE_EMAIL_DELIVERY`), y las
+  variables de Resend quedan en `.env.example`.
+- **colaboradores — US-135 Una tanda de invitaciones sale de una vez (gravedad
+  media):** hasta 20 correos salían uno por uno, con 10 s de espera cada uno,
+  y si la función se cortaba a media tanda quedaban invitaciones pendientes
+  que nunca recibieron su correo. Ahora la tanda sale en una sola petición
+  (`mail.send_batch`, el endpoint de tandas de Resend) y en la misma
+  transacción que las invitaciones: un corte no deja ninguna pendiente sin su
+  correo.
 
 ---
 

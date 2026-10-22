@@ -14,7 +14,7 @@ from rest_framework.exceptions import APIException, NotFound, ValidationError
 from apps.accounts.models import User
 from apps.accounts.services import check_password_strength, find_user, normalize_email
 from apps.legal.services import record_acceptance
-from apps.team.emails import send_invitation_email
+from apps.team.emails import send_invitation_email, send_invitation_emails
 from apps.team.models import Invitation, Membership
 from apps.team.selectors import (
     get_invitation,
@@ -76,14 +76,18 @@ def _refresh_link(invitation: Invitation) -> str:
     return token
 
 
+@transaction.atomic
 def invite_collaborators(*, account: User, emails: list[str]) -> InviteResult:
     """Invita a cada correo a la empresa de ``account``.
 
     No se manda una segunda invitación a quien ya colabora o ya tiene una
-    vigente; una vencida se renueva. Si el correo no sale, la invitación queda
-    y se puede reenviar.
+    vigente; una vencida se renueva. Los correos salen en una sola tanda y en
+    la misma transacción que las invitaciones: si algo corta el envío a la
+    mitad, no queda ninguna pendiente sin su correo (iteracion-16). Si el
+    correo no sale, las invitaciones quedan y se pueden reenviar.
     """
     result = InviteResult()
+    links: list[tuple[Invitation, str]] = []
     seen: set[str] = set()
     for raw in emails:
         email = normalize_email(raw)
@@ -113,20 +117,30 @@ def invite_collaborators(*, account: User, emails: list[str]) -> InviteResult:
             )
             continue
 
-        with transaction.atomic():
-            if invitation is None:
-                token, token_hash = _new_link()
-                now = timezone.now()
-                invitation = Invitation.objects.create(
-                    account=account,
-                    email=email,
-                    token_hash=token_hash,
-                    sent_at=now,
-                    expires_at=now + timedelta(days=INVITATION_DAYS),
-                )
-            else:
-                token = _refresh_link(invitation)
-        result.invited.append(_send(invitation, token))
+        if invitation is None:
+            token, token_hash = _new_link()
+            now = timezone.now()
+            invitation = Invitation.objects.create(
+                account=account,
+                email=email,
+                token_hash=token_hash,
+                sent_at=now,
+                expires_at=now + timedelta(days=INVITATION_DAYS),
+            )
+        else:
+            token = _refresh_link(invitation)
+        links.append((invitation, token))
+
+    if links:
+        sent = send_invitation_emails(
+            account=account,
+            links=[(invitation.email, token) for invitation, token in links],
+            days=INVITATION_DAYS,
+        )
+        logger.info("Invitations sent", extra={"count": len(links), "delivered": sent})
+        result.invited = [
+            Sent(invitation=invitation, email_sent=sent) for invitation, _ in links
+        ]
     return result
 
 

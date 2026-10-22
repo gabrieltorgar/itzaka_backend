@@ -266,6 +266,13 @@ DOCUMENT_EMAIL_MAX_BYTES = env.int("DOCUMENT_EMAIL_MAX_BYTES", default=8 * 1024 
 # invalida la llave —Resend contesta 401— sin que se vea en ningún lado.
 RESEND_API_KEY = env.str("RESEND_API_KEY", default="").strip()
 RESEND_FROM = env.str("RESEND_FROM", default="CUOTREKA <onboarding@resend.dev>").strip()
+# Producción no sale sin correo (iteracion-16): sin la llave, o con el remitente
+# de prueba de Resend, `migrate` —parte del build— se detiene (common/checks.py)
+# y un correo que no puede salir queda como error, no como aviso.
+REQUIRE_EMAIL_DELIVERY = env.bool(
+    "REQUIRE_EMAIL_DELIVERY",
+    default=env.str("VERCEL_ENV", default="") == "production",
+)
 # A dónde llevan los enlaces de los correos: la aplicación, no la API.
 APP_BASE_URL = env.str("APP_BASE_URL", default="https://cuotreka.vercel.app")
 

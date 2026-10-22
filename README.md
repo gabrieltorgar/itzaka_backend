@@ -124,6 +124,10 @@ Archivo: `src/core/.env.example` → cópialo a `src/core/.env`. Aquí solo van 
 | `RECAPTCHA_SECRET_KEY` | Verification turns on with the secret key (RECAPTCHA_ENABLED follows it). The site key goes to the frontend as VITE_RECAPTCHA_SITE_KEY: set both. |
 | `RECAPTCHA_MIN_SCORE` | — |
 | `RECAPTCHA_HOSTNAMES` | — |
+| `RESEND_API_KEY` | Without the key no email goes out. Production refuses to deploy without it. |
+| `RESEND_FROM` | A sender of a domain verified in Resend: its test sender (onboarding@resend.dev) only delivers to the Resend account owner, and production refuses it too. |
+| `APP_BASE_URL` | Where the links in the emails lead: the application, not the API. |
+| `REQUIRE_EMAIL_DELIVERY` | On by default where VERCEL_ENV=production: `migrate` stops the deploy when mail cannot go out, and a mail that cannot be sent is logged as an error. |
 | `THROTTLE_ANON` | Run `uv run python src/manage.py createcachetable` once after migrating. |
 | `THROTTLE_USER` | — |
 | `NUM_PROXIES` | Proxies in front of Django (Vercel = 1), so limits key on the client IP. |
@@ -248,13 +252,16 @@ Pendiente: la tabla sale de `uv run python src/manage.py api_routes --format md`
 ### Correo — Resend
 
 Los códigos de verificación, las invitaciones y los documentos salen por la API
-HTTP de Resend (`common/mail.py`).
+HTTP de Resend (`common/mail.py`); las invitaciones de una tanda, en una sola
+petición. En producción el despliegue se detiene si falta la llave o el
+remitente es el de prueba (`common/checks.py`, corre con `migrate`).
 
 | Variable | Uso |
 |---|---|
 | `RESEND_API_KEY` | Llave de la API; sin ella no sale ningún correo |
 | `RESEND_FROM` | Remitente de un dominio verificado en Resend; el de prueba (`onboarding@resend.dev`) sólo entrega al dueño de la cuenta |
 | `APP_BASE_URL` | Dominio de la aplicación en los enlaces de los correos |
+| `REQUIRE_EMAIL_DELIVERY` | Correo obligatorio; encendido por omisión con `VERCEL_ENV=production` |
 | `DOCUMENT_EMAIL_MAX_BYTES` | Tope del PDF que viaja adjunto |
 
 ### Archivos — Cloudflare R2
