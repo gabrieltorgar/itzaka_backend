@@ -16,7 +16,7 @@ boto3==1.43.114
     # via
     #   django-storages
     #   presuplano-backend
-botocore==1.43.114
+botocore==1.43.116
     # via
     #   boto3
     #   s3transfer
@@ -79,6 +79,8 @@ numpy==2.5.4
     #   presuplano-backend
 opencv-python-headless==5.0.0.93
     # via presuplano-backend
+opentelemetry-api==1.45.1
+    # via anthropic
 packaging==26.3
     # via django-csp
 phonenumbers==9.0.41
@@ -114,6 +116,7 @@ typing-extensions==4.16.0
     #   anthropic
     #   anyio
     #   httpx2
+    #   opentelemetry-api
     #   psycopg
     #   pydantic
     #   pydantic-core
