@@ -7,16 +7,19 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 
+from apps.projects.filters import ProjectFilter
 from apps.projects.selectors import (
     evidences_for_owner,
     list_projects_for_owner,
     progresses_for_owner,
+    project_rows_for_owner,
 )
 from apps.projects.serializers import (
     EvidenceSerializer,
     ProgressInputSerializer,
     ProgressSerializer,
     ProgressUpdateSerializer,
+    ProjectListSerializer,
     ProjectSerializer,
     StartProjectSerializer,
 )
@@ -33,13 +36,35 @@ from apps.team.tenancy import account_of
 
 
 class ProjectViewSet(viewsets.ReadOnlyModelViewSet):
-    """List/retrieve projects; start a project; register progress."""
+    """List/retrieve projects; start a project; register progress.
+
+    The list (US-67, iteracion-17) brings rows without progress entries or
+    photos: ``?status=a,b`` and ``?id=a,b``; searches by client; orders by
+    progress, quoted value or client, least progress first by default. Each
+    project is asked for on its own, with everything its screen shows.
+    """
 
     serializer_class = ProjectSerializer
     permission_classes = [IsAuthenticated]
+    filterset_class = ProjectFilter
+    search_fields = ("quote__client__name",)
+    ordering_fields = (
+        "progress_percentage",
+        "quoted_value",
+        "client_name",
+        "created_at",
+    )
+    ordering_text_fields = ("client_name",)
+    ordering = ("progress_percentage", "-created_at", "id")
 
     def get_queryset(self):
-        return list_projects_for_owner(owner=account_of(self.request))
+        owner = account_of(self.request)
+        if self.action == "list":
+            return project_rows_for_owner(owner=owner)
+        return list_projects_for_owner(owner=owner)
+
+    def get_serializer_class(self):
+        return ProjectListSerializer if self.action == "list" else ProjectSerializer
 
     def create(self, request: Request, *args, **kwargs) -> Response:
         serializer = StartProjectSerializer(

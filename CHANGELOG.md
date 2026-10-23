@@ -27,6 +27,15 @@ Todas las notas de cambios relevantes de la API. El formato sigue
   cliente (`client_name`); por omisión, la más reciente. El importe y el
   cliente se calculan en la consulta, así que ordenar por ellos abarca todas
   las páginas.
+- **proyectos — US-67 La lista de proyectos sin avances ni fotos:**
+  `GET /api/projects/` entrega cada fila con su cliente, estado, cotizado,
+  avanzado y porcentaje, sin partidas, avances ni fotos; filtra por estado
+  (varios a la vez), busca por cliente y ordena por avance
+  (`progress_percentage`), cotizado (`quoted_value`) o cliente
+  (`client_name`); por omisión, el de menos avance. Lo cotizado y lo avanzado
+  se calculan en la consulta, cada uno en su subconsulta, así que ordenar
+  abarca todas las páginas. `GET /api/projects/{id}/` sigue trayendo el
+  proyecto completo.
 
 ### Changed
 - **API — TEC Contrato de listas en el backend (US-77 · US-79):** todas las
