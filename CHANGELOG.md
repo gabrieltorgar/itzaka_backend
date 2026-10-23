@@ -5,6 +5,15 @@ Todas las notas de cambios relevantes de la API. El formato sigue
 
 ## [Unreleased] — iteracion-17
 
+### Added
+- **servicios — US-06 · US-110 El catálogo se pide por páginas y se borra en
+  lote:** `GET /api/tariffs/` filtra por tipo de unidad (`?unit_type=a,b`),
+  busca en nombre y descripción, ordena por nombre, precio o fecha de alta (por
+  omisión, de la A a la Z) y `?id=a,b` rotula un selector sin bajar el
+  catálogo. `POST /api/tariffs/bulk/delete/` borra la selección o todos los
+  resultados de la búsqueda; el que está en una cotización se queda y dice por
+  qué.
+
 ### Changed
 - **API — TEC Contrato de listas en el backend (US-77 · US-79):** todas las
   listas paginan siempre: sin `page` llegan las 20 primeras con `count`,
