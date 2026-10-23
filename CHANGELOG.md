@@ -57,6 +57,14 @@ Todas las notas de cambios relevantes de la API. El formato sigue
   desde cuándo. `POST /api/collaborators/bulk/<acción>/` activa, desactiva,
   quita o cancela varios: la acción que no aplica a una fila —desactivar una
   invitación, cancelar a un colaborador— dice por qué y las demás siguen.
+- **plataforma — TEC Pruebas base del contrato de listas:**
+  `tests/platform/test_list_contract.py` revisa cada vista que lista: que
+  pagine con `DefaultPagination`, declare sus filtros, su búsqueda y una lista
+  blanca de orden, y ordene por omisión con desempate por id; que las dos
+  listas que no son vistas genéricas (colaboradores y mobiliario) también
+  paginen, y que cada acción en lote tenga su límite `bulk`. Una vista nueva
+  que no cumpla el contrato deja la línea base en rojo. Las pruebas de
+  plataforma leen sus archivos en UTF-8: en Windows leían en cp1252.
 
 ### Changed
 - **API — TEC Contrato de listas en el backend (US-77 · US-79):** todas las

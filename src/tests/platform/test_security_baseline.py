@@ -76,9 +76,9 @@ def test_production_https_settings_are_declared():
     This project keeps CSRF_TRUSTED_ORIGINS in settings.py (it merges the
     Vercel hosts and the CORS origins); the rest lives in core/env.py.
     """
-    source = (SRC / "core" / "env.py").read_text() + (
+    source = (SRC / "core" / "env.py").read_text(encoding="utf-8") + (
         SRC / "core" / "settings.py"
-    ).read_text()
+    ).read_text(encoding="utf-8")
     for name in (
         "SECURE_PROXY_SSL_HEADER",
         "SECURE_SSL_REDIRECT",
@@ -104,7 +104,7 @@ def _assign_value(node, target):
 def test_serializers_list_fields_explicitly():
     offenders = []
     for path in _py_files():
-        tree = ast.parse(path.read_text())
+        tree = ast.parse(path.read_text(encoding="utf-8"))
         metas = [n for n in ast.walk(tree) if isinstance(n, ast.ClassDef)]
         for cls in [n for n in metas if n.name == "Meta"]:
             for a in _assign_value(cls, "fields"):
@@ -132,7 +132,7 @@ def _is_dynamic_string(node):
 def test_raw_sql_is_parameterized():
     offenders = []
     for path in _py_files():
-        tree = ast.parse(path.read_text())
+        tree = ast.parse(path.read_text(encoding="utf-8"))
         calls = [
             n
             for n in ast.walk(tree)
@@ -154,7 +154,7 @@ def test_raw_sql_is_parameterized():
 def test_no_password_or_token_in_logs():
     offenders = []
     for path in _py_files():
-        for i, line in enumerate(path.read_text().splitlines(), 1):
+        for i, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
             low = line.lower()
             if "logger." in low and any(
                 w in low for w in ("password", "token", "secret", "otp_code")
