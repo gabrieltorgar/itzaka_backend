@@ -20,6 +20,13 @@ Todas las notas de cambios relevantes de la API. El formato sigue
   lista. `POST /api/clients/bulk/delete/` borra la selección o todos los
   resultados de la búsqueda; el que está en una cotización se queda y dice por
   qué.
+- **cotizaciones — US-13 Las cotizaciones se piden por páginas:**
+  `GET /api/quotes/` filtra por estado (varios a la vez,
+  `?status=draft,in_project`) y por plano (`?plan=a,b`: las que salieron de
+  esos planos), busca por cliente y ordena por fecha, importe (`total`) o
+  cliente (`client_name`); por omisión, la más reciente. El importe y el
+  cliente se calculan en la consulta, así que ordenar por ellos abarca todas
+  las páginas.
 
 ### Changed
 - **API — TEC Contrato de listas en el backend (US-77 · US-79):** todas las
