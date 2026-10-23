@@ -49,6 +49,9 @@ Todas las notas de cambios relevantes de la API. El formato sigue
   ya está pendiente; aceptar a la vez dos invitaciones al mismo correo nuevo
   crea una cuenta y la otra pide entrar con su contraseña (409
   `account_exists`).
+- **planos — US-92 El id de un plano no cambia al editarlo:** el id lo pone el
+  editor al crear el plano; una edición (`PATCH`/`PUT /api/plans/<id>/`) con
+  otro id responde 400 y no guarda nada.
 
 ---
 
