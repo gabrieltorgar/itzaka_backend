@@ -3,7 +3,7 @@
 Todas las notas de cambios relevantes de la API. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es-ES/) y versionado semántico.
 
-## [Unreleased] — iteracion-17
+## [3.8.0] — 2026-10-23 · iteracion-17: contrato de listas y acciones en lote
 
 ### Added
 - **servicios — US-06 · US-110 El catálogo se pide por páginas y se borra en
