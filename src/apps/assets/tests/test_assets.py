@@ -158,7 +158,7 @@ class TestCatalogoDeModelos:
 
         assert guardado.status_code == status.HTTP_201_CREATED
         assert guardado.data["stored"] == 1
-        assert authenticated_client.get(MODELOS).data == [SILLA]
+        assert authenticated_client.get(MODELOS).data["results"] == [SILLA]
 
     def test_importing_the_same_library_twice_does_not_duplicate(
         self, authenticated_client
@@ -169,7 +169,7 @@ class TestCatalogoDeModelos:
         renombrada = {**SILLA, "name": "Silla de comedor"}
         authenticated_client.post(MODELOS, {"models": [renombrada]}, format="json")
 
-        assert authenticated_client.get(MODELOS).data == [renombrada]
+        assert authenticated_client.get(MODELOS).data["results"] == [renombrada]
 
     def test_a_fiche_without_an_id_is_refused(self, authenticated_client) -> None:
         """Caso de borde - Sin id no hay con qué volver a pedirla."""
@@ -188,7 +188,7 @@ class TestCatalogoDeModelos:
         )
 
         assert quitado.data["removed"] == 1
-        assert authenticated_client.get(MODELOS).data == []
+        assert authenticated_client.get(MODELOS).data["results"] == []
 
     def test_the_catalog_is_isolated_per_account(
         self, authenticated_client, user_factory
@@ -197,7 +197,7 @@ class TestCatalogoDeModelos:
         otra = user_factory()
         CatalogModel.objects.create(owner=otra, model_id="ajeno", fiche=SILLA)
 
-        assert authenticated_client.get(MODELOS).data == []
+        assert authenticated_client.get(MODELOS).data["results"] == []
 
     def test_without_a_session_there_is_no_catalog(self, api_client) -> None:
         """Caso de borde - Sin sesión no hay catálogo."""

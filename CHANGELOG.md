@@ -70,6 +70,12 @@ Todas las notas de cambios relevantes de la API. El formato sigue
   (`?status=a,b`) y `common/bulk.py` la base de las acciones en lote
   (`POST /api/<recurso>/bulk/<acción>/`, hasta `BULK_MAX_ITEMS` = 500
   registros, límite `bulk` de 30 por minuto).
+- **API — TEC Contrato de listas: las listas que no son una pantalla:** los
+  pagos de un proyecto, los avances, el reparto, los pagos al personal y los
+  archivos del editor declaran sus filtros —los mismos `?project=` y
+  `?worker=` de siempre, ahora validados: un id mal escrito es 400—, su
+  búsqueda y un orden estable. `GET /api/plan-models/` llega por páginas como
+  las demás listas; antes daba todas las fichas en un arreglo.
 
 ---
 

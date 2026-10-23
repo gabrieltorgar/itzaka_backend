@@ -7,7 +7,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 
-from apps.projects.filters import ProjectFilter
+from apps.projects.filters import ProgressFilter, ProjectFilter
 from apps.projects.selectors import (
     evidences_for_owner,
     list_projects_for_owner,
@@ -107,6 +107,12 @@ class ProgressViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = ProgressSerializer
     permission_classes = [IsAuthenticated]
     parser_classes = [JSONParser, MultiPartParser, FormParser]
+    # La lista (iteracion-17): por páginas, por proyecto, partida o persona, y en
+    # el orden en que se trabajó.
+    filterset_class = ProgressFilter
+    search_fields = ("quote_item__name", "worker__name")
+    ordering_fields = ("date", "quantity", "created_at")
+    ordering = ("date", "created_at", "id")
 
     def get_queryset(self):
         return progresses_for_owner(owner=account_of(self.request))

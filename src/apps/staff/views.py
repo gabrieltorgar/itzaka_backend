@@ -7,7 +7,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 
-from apps.staff.filters import WorkerFilter
+from apps.staff.filters import AssignmentFilter, WorkerFilter, WorkerPaymentFilter
 from apps.staff.selectors import (
     get_owned_worker,
     list_assignments_for_owner,
@@ -80,12 +80,14 @@ class AssignmentViewSet(viewsets.ModelViewSet):
 
     serializer_class = AssignmentSerializer
     permission_classes = [IsAuthenticated]
+    # La lista (iteracion-17): por páginas, ``?project=`` y ``?worker=``.
+    filterset_class = AssignmentFilter
+    search_fields = ("worker__name", "quote_item__name")
+    ordering_fields = ("created_at", "quantity")
+    ordering = ("created_at", "id")
 
     def get_queryset(self):
-        return list_assignments_for_owner(
-            owner=account_of(self.request),
-            project_id=self.request.query_params.get("project"),
-        )
+        return list_assignments_for_owner(owner=account_of(self.request))
 
     def _hand_out(self, request: Request, payload: dict):
         serializer = AssignmentInputSerializer(
@@ -120,13 +122,15 @@ class WorkerPaymentViewSet(viewsets.ReadOnlyModelViewSet):
 
     serializer_class = WorkerPaymentSerializer
     permission_classes = [IsAuthenticated]
+    # La lista (iteracion-17): por páginas, ``?worker=`` y ``?project=``, en
+    # orden de fecha.
+    filterset_class = WorkerPaymentFilter
+    search_fields = ("worker__name", "note")
+    ordering_fields = ("date", "amount", "created_at")
+    ordering = ("date", "created_at", "id")
 
     def get_queryset(self):
-        return list_worker_payments_for_owner(
-            owner=account_of(self.request),
-            worker_id=self.request.query_params.get("worker"),
-            project_id=self.request.query_params.get("project"),
-        )
+        return list_worker_payments_for_owner(owner=account_of(self.request))
 
     def create(self, request: Request, *args, **kwargs) -> Response:
         serializer = WorkerPaymentInputSerializer(

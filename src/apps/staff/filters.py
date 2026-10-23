@@ -1,9 +1,12 @@
-"""Filtros de GET /api/workers/ (api-lists-errors.md §2, iteracion-17 #8)."""
+"""Filtros de las listas del personal (api-lists-errors.md §2, iteracion-17).
+
+``/api/workers/`` (#8), ``/api/assignments/`` y ``/api/worker-payments/`` (#1).
+"""
 
 from django.db.models import Exists, OuterRef
 from django_filters import rest_framework as filters
 
-from apps.staff.models import Worker, WorkerService
+from apps.staff.models import Assignment, Worker, WorkerPayment, WorkerService
 from common.filters import UUIDInFilter
 
 
@@ -27,3 +30,25 @@ class WorkerFilter(filters.FilterSet):
         # Con Exists y no con un join: cada quien aparece una sola vez.
         does = WorkerService.objects.filter(worker=OuterRef("pk"), tariff_id=value)
         return queryset.filter(Exists(does))
+
+
+class AssignmentFilter(filters.FilterSet):
+    """El reparto de un proyecto o de una persona: ``?project=`` como siempre."""
+
+    project = filters.UUIDFilter(field_name="project")
+    worker = filters.UUIDFilter(field_name="worker")
+
+    class Meta:
+        model = Assignment
+        fields = ("project", "worker")
+
+
+class WorkerPaymentFilter(filters.FilterSet):
+    """Los pagos de una persona o de un proyecto: ``?worker=`` y ``?project=``."""
+
+    worker = filters.UUIDFilter(field_name="worker")
+    project = filters.UUIDFilter(field_name="project")
+
+    class Meta:
+        model = WorkerPayment
+        fields = ("worker", "project")
