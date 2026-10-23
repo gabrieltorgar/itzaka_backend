@@ -2,11 +2,17 @@
 
 import json
 import logging
+import os
+import subprocess
+import sys
 import urllib.error
+from pathlib import Path
 
 import pytest
+from django.core.checks import run_checks
 
-from common import mail
+import core.settings as core_settings
+from common import checks, mail
 from common.branding import OPTIMIZED_BY, Brand
 from common.emails import render_email
 
@@ -182,3 +188,137 @@ class TestPlantilla:
 
         assert "<script>" not in html
         assert "&lt;script&gt;" in html
+
+
+class TestProduccionSinCorreo:
+    """Bug iteracion-16 - Producción no sale sin correo (US-135).
+
+    Sin la llave de Resend, o con su remitente de prueba, los códigos, las
+    invitaciones y los documentos no le llegan a nadie, y sólo quedaba un aviso
+    en el registro. El chequeo corre con ``migrate``, que es parte del build:
+    el despliegue de producción se detiene y la versión anterior sigue.
+    """
+
+    def test_without_the_key_production_does_not_deploy(self, settings) -> None:
+        settings.REQUIRE_EMAIL_DELIVERY = True
+        settings.RESEND_API_KEY = ""
+        settings.RESEND_FROM = "CUOTREKA <hola@cuotreka.mx>"
+
+        errores = checks.email_delivery(None)
+
+        assert [error.id for error in errores] == ["common.E001"]
+        assert "RESEND_API_KEY" in errores[0].msg
+
+    def test_with_the_test_sender_production_does_not_deploy(self, settings) -> None:
+        settings.REQUIRE_EMAIL_DELIVERY = True
+        settings.RESEND_API_KEY = "re_test"
+        settings.RESEND_FROM = "CUOTREKA <onboarding@resend.dev>"
+
+        errores = checks.email_delivery(None)
+
+        assert [error.id for error in errores] == ["common.E002"]
+        assert "RESEND_FROM" in errores[0].msg
+
+    def test_with_both_set_production_deploys(self, settings, configurado) -> None:
+        settings.REQUIRE_EMAIL_DELIVERY = True
+
+        assert checks.email_delivery(None) == []
+
+    def test_outside_production_mail_is_optional(self, settings) -> None:
+        settings.REQUIRE_EMAIL_DELIVERY = False
+        settings.RESEND_API_KEY = ""
+
+        assert checks.email_delivery(None) == []
+
+    def test_the_check_runs_with_the_build(self, settings) -> None:
+        """Está registrado: migrate y createcachetable lo corren."""
+        settings.REQUIRE_EMAIL_DELIVERY = True
+        settings.RESEND_API_KEY = ""
+
+        ids = {error.id for error in run_checks(tags=["email"])}
+
+        assert "common.E001" in ids
+
+    @pytest.mark.parametrize(
+        ("vercel_env", "esperado"), [("production", "True"), ("preview", "False")]
+    )
+    def test_production_requires_it_by_default(self, vercel_env, esperado) -> None:
+        entorno = {k: v for k, v in os.environ.items() if k != "REQUIRE_EMAIL_DELIVERY"}
+        entorno["VERCEL_ENV"] = vercel_env
+        entorno["DJANGO_SETTINGS_MODULE"] = "core.settings"
+        salida = subprocess.run(  # noqa: S603 -- el mismo intérprete, sin shell
+            [
+                sys.executable,
+                "-c",
+                "from django.conf import settings as s; "
+                "print(s.REQUIRE_EMAIL_DELIVERY)",
+            ],
+            cwd=Path(core_settings.__file__).resolve().parents[1],
+            env=entorno,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        assert salida.stdout.strip() == esperado
+
+    def test_a_mail_that_cannot_go_out_is_an_error_in_production(
+        self, settings, caplog
+    ) -> None:
+        settings.REQUIRE_EMAIL_DELIVERY = True
+        settings.RESEND_API_KEY = ""
+
+        with caplog.at_level(logging.WARNING, logger="apps"):
+            assert mail.send_email(to="ana@estudio.mx", subject="x", html="x") is False
+
+        assert any(r.levelno == logging.ERROR for r in caplog.records)
+
+
+class TestTanda:
+    """Bug iteracion-16 - Una tanda sale de una vez (US-135).
+
+    Veinte correos uno por uno, con 10 s de espera cada uno, podían pasar del
+    tiempo de la función; una sola petición a la tanda de Resend no.
+    """
+
+    def test_a_batch_is_one_request(self, configurado, mocker) -> None:
+        urlopen = mocker.patch("urllib.request.urlopen", return_value=FakeResponse(200))
+        mensajes = [
+            mail.Message(to=f"p{n}@obra.mx", subject=f"Hola {n}", html=f"<p>{n}</p>")
+            for n in range(20)
+        ]
+
+        assert mail.send_batch(mensajes) is True
+
+        urlopen.assert_called_once()
+        request = urlopen.call_args.args[0]
+        assert request.full_url == mail.RESEND_BATCH_ENDPOINT
+        cuerpo = json.loads(request.data)
+        assert [item["to"] for item in cuerpo] == [[f"p{n}@obra.mx"] for n in range(20)]
+        assert {item["from"] for item in cuerpo} == {"CUOTREKA <hola@cuotreka.mx>"}
+        assert cuerpo[3]["subject"] == "Hola 3"
+
+    def test_a_refused_batch_sends_nothing(self, configurado, mocker) -> None:
+        mocker.patch(
+            "urllib.request.urlopen",
+            side_effect=urllib.error.HTTPError(
+                mail.RESEND_BATCH_ENDPOINT, 422, "Unprocessable", {}, None
+            ),
+        )
+        mensaje = mail.Message(to="ana@estudio.mx", subject="x", html="x")
+
+        assert mail.send_batch([mensaje]) is False
+
+    def test_without_a_key_the_batch_does_not_go_out(self, settings, mocker) -> None:
+        settings.RESEND_API_KEY = ""
+        urlopen = mocker.patch("urllib.request.urlopen")
+        mensaje = mail.Message(to="ana@estudio.mx", subject="x", html="x")
+
+        assert mail.send_batch([mensaje]) is False
+        urlopen.assert_not_called()
+
+    def test_an_empty_batch_is_nothing_to_send(self, configurado, mocker) -> None:
+        urlopen = mocker.patch("urllib.request.urlopen")
+
+        assert mail.send_batch([]) is True
+        urlopen.assert_not_called()

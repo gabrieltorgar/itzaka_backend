@@ -46,7 +46,8 @@ def colaborador(admin):
 @pytest.fixture
 def correo(settings, mocker):
     settings.RESEND_API_KEY = "re_test"
-    return mocker.patch("apps.team.emails.mail.send_email", return_value=True)
+    # Las invitaciones salen en tanda; ninguna prueba llega a Resend.
+    return mocker.patch("apps.team.emails.mail.send_batch", return_value=True)
 
 
 @pytest.mark.django_db

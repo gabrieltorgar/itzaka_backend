@@ -56,6 +56,12 @@ class PlanSerializer(serializers.ModelSerializer):
         fields = ["id", "name", "document", "created_at", "updated_at"]
         read_only_fields = ["created_at", "updated_at"]
 
+    def validate_id(self, value):
+        """El id se pone al crear el plano y no cambia después."""
+        if self.instance is not None and value != self.instance.pk:
+            raise serializers.ValidationError("El id de un plano no cambia.")
+        return value
+
     def validate_document(self, value):
         """Keep one scanned plan from taking the database down with it.
 

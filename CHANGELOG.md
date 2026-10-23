@@ -3,6 +3,58 @@
 Todas las notas de cambios relevantes de la API. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es-ES/) y versionado semántico.
 
+## [3.7.2] — 2026-10-22 · iteracion-16: bugs agrupados por gravedad
+
+### Added
+- **repositorio — TEC Archivos de trabajo del repositorio:** guía de
+  desarrollo para personas y agentes (`.claude/CLAUDE.md`), reglas de
+  contribución y del stack (`.claude/rules/`), `AGENTS.md` y `CONTRIBUTING.md`.
+  El README adopta el formato de la casa —bloques generados de versión, stack,
+  variables, comandos, quality gate, estructura, despliegue y contribución— y
+  suma las secciones de módulos, autenticación y sesión, integraciones y
+  administración, sin borrar el texto que ya tenía.
+
+### Fixed
+- **colaboradores — US-139 Reenviar sin dejar a la persona sin enlace
+  (gravedad media-alta):** el reenvío cambiaba el enlace antes de mandar el
+  correo; si el correo fallaba, el enlace anterior ya no servía y el nuevo no
+  llegaba. Ahora el enlace nuevo reemplaza al anterior sólo cuando el correo
+  salió: si no sale, `POST /api/collaborators/invitations/<id>/resend/` responde
+  503 con `code: email_not_sent` y la invitación queda como estaba. La
+  respuesta dice si el correo salió (`email_sent`).
+- **correo — US-135 Producción no sale sin correo (gravedad media):** sin
+  `RESEND_API_KEY`, o con el remitente de prueba de Resend, los códigos, las
+  invitaciones y los documentos no le llegaban a nadie y sólo quedaba un aviso
+  en el registro. Ahora `common/checks.py` (corre con `migrate`, parte del
+  build) detiene el despliegue de producción y la versión anterior sigue
+  atendiendo; un correo que no puede salir queda como error. Encendido por
+  omisión con `VERCEL_ENV=production` (`REQUIRE_EMAIL_DELIVERY`), y las
+  variables de Resend quedan en `.env.example`.
+- **colaboradores — US-135 Una tanda de invitaciones sale de una vez (gravedad
+  media):** hasta 20 correos salían uno por uno, con 10 s de espera cada uno,
+  y si la función se cortaba a media tanda quedaban invitaciones pendientes
+  que nunca recibieron su correo. Ahora la tanda sale en una sola petición
+  (`mail.send_batch`, el endpoint de tandas de Resend) y en la misma
+  transacción que las invitaciones: un corte no deja ninguna pendiente sin su
+  correo.
+- **colaboradores — US-136 El campo trampa lleno no deja una sesión a medias
+  (gravedad baja):** la aceptación que el campo trampa descarta respondía sin
+  `company`, y la aplicación fallaba después de guardar una sesión falsa.
+  Ahora responde con la misma forma que una aceptación de verdad —la persona y
+  la empresa a la que se entra—, sin cuenta ni sesión detrás.
+- **API — US-135 · US-136 Dos peticiones al mismo tiempo no terminan en 500
+  (gravedad baja):** una restricción única que choca entre dos peticiones
+  responde 409 con qué hacer (`code: conflict`), sin el mensaje de la base.
+  Invitar a la vez el mismo correo deja una sola invitación y la otra dice que
+  ya está pendiente; aceptar a la vez dos invitaciones al mismo correo nuevo
+  crea una cuenta y la otra pide entrar con su contraseña (409
+  `account_exists`).
+- **planos — US-92 El id de un plano no cambia al editarlo:** el id lo pone el
+  editor al crear el plano; una edición (`PATCH`/`PUT /api/plans/<id>/`) con
+  otro id responde 400 y no guarda nada.
+
+---
+
 ## [3.7.1] — 2026-10-21 · iteracion-15: documentos legales en producción
 
 ### Fixed

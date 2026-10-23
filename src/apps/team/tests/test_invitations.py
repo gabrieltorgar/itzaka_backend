@@ -26,19 +26,23 @@ URL = "/api/collaborators/invitations/"
 
 @pytest.fixture
 def correo(settings, mocker):
-    """El correo configurado, con el envío interceptado."""
+    """El correo configurado, con la tanda interceptada (una sola petición)."""
     settings.RESEND_API_KEY = "re_test"
     settings.APP_BASE_URL = "https://cuotreka.vercel.app"
-    return mocker.patch("apps.team.emails.mail.send_email", return_value=True)
+    return mocker.patch("apps.team.emails.mail.send_batch", return_value=True)
+
+
+def mensajes(correo):
+    """Los correos de todas las tandas enviadas, en orden."""
+    return [mensaje for llamada in correo.call_args_list for mensaje in llamada.args[0]]
 
 
 def enlaces(correo):
     """El token de cada correo enviado, sacado del enlace del botón."""
     tokens = []
-    for llamada in correo.call_args_list:
-        html = llamada.kwargs["html"]
-        inicio = html.index("/invitacion/") + len("/invitacion/")
-        tokens.append(html[inicio : html.index('"', inicio)])
+    for mensaje in mensajes(correo):
+        inicio = mensaje.html.index("/invitacion/") + len("/invitacion/")
+        tokens.append(mensaje.html[inicio : mensaje.html.index('"', inicio)])
     return tokens
 
 
@@ -59,8 +63,8 @@ class TestInvitarAVarios:
             "luis@obra.mx",
         ]
         assert response.data["skipped"] == []
-        assert correo.call_count == 2
-        assert {c.kwargs["to"] for c in correo.call_args_list} == {
+        assert correo.call_count == 1
+        assert {m.to for m in mensajes(correo)} == {
             "ana@estudio.mx",
             "luis@obra.mx",
         }
@@ -76,7 +80,7 @@ class TestInvitarAVarios:
         invitacion = Invitation.objects.get()
         vigencia = invitacion.expires_at - timezone.now()
         assert timedelta(days=6, hours=23) < vigencia <= timedelta(days=7)
-        assert "vence en 7 días" in correo.call_args.kwargs["html"]
+        assert "vence en 7 días" in mensajes(correo)[0].html
 
     def test_only_a_fingerprint_of_the_link_is_kept(
         self, authenticated_client, correo
@@ -98,10 +102,10 @@ class TestInvitarAVarios:
 
         authenticated_client.post(URL, {"emails": ["ana@estudio.mx"]}, format="json")
 
-        llamada = correo.call_args.kwargs
-        assert "Estudio Reyes" in llamada["subject"]
-        assert "Estudio Reyes" in llamada["html"]
-        assert "https://cuotreka.vercel.app/invitacion/" in llamada["html"]
+        [mensaje] = mensajes(correo)
+        assert "Estudio Reyes" in mensaje.subject
+        assert "Estudio Reyes" in mensaje.html
+        assert "https://cuotreka.vercel.app/invitacion/" in mensaje.html
 
     def test_the_same_email_twice_in_one_go_is_one_invitation(
         self, authenticated_client, correo
@@ -111,7 +115,7 @@ class TestInvitarAVarios:
         )
 
         assert len(response.data["invited"]) == 1
-        assert correo.call_count == 1
+        assert len(mensajes(correo)) == 1
 
 
 @pytest.mark.django_db
@@ -132,7 +136,7 @@ class TestCorreoQueYaEsta:
             {"email": miembro.user.email, "reason": "Ya es colaborador."}
         ]
         assert [i["email"] for i in response.data["invited"]] == ["nuevo@obra.mx"]
-        assert correo.call_count == 1
+        assert [m.to for m in mensajes(correo)] == ["nuevo@obra.mx"]
 
     def test_a_pending_invitation_is_not_sent_twice(
         self, authenticated_client, user, correo
@@ -246,6 +250,40 @@ class TestCasosDeBorde:
         assert Invitation.objects.filter(status="pending").count() == 1
 
 
+@pytest.mark.django_db
+class TestTanda:
+    """Bug iteracion-16 - Una tanda sale de una vez.
+
+    Veinte correos uno por uno, con 10 s de espera cada uno, podían pasar del
+    tiempo de la función; si se cortaba a media tanda quedaban invitaciones
+    pendientes que nunca recibieron su correo.
+    """
+
+    def test_twenty_go_out_in_one_send(self, authenticated_client, user, correo):
+        emails = [f"p{n:02d}@obra.mx" for n in range(20)]
+
+        response = authenticated_client.post(URL, {"emails": emails}, format="json")
+
+        assert response.status_code == status.HTTP_201_CREATED
+        correo.assert_called_once()
+        assert [m.to for m in mensajes(correo)] == emails
+        assert len(set(enlaces(correo))) == 20
+        assert all(i["email_sent"] for i in response.data["invited"])
+        assert Invitation.objects.filter(account=user).count() == 20
+
+    def test_if_the_send_is_cut_no_invitation_is_left_without_its_email(
+        self, authenticated_client, correo
+    ) -> None:
+        correo.side_effect = RuntimeError("la función se cortó a media tanda")
+
+        with pytest.raises(RuntimeError):
+            authenticated_client.post(
+                URL, {"emails": ["ana@estudio.mx", "luis@obra.mx"]}, format="json"
+            )
+
+        assert not Invitation.objects.exists()
+
+
 class TestEnlaceDeLaMarca:
     """Sin APP_BASE_URL configurada, el enlace va al dominio de CUOTREKA."""
 
@@ -266,3 +304,29 @@ class TestEnlaceDeLaMarca:
         )
 
         assert salida.stdout.strip() == "https://cuotreka.vercel.app"
+
+
+@pytest.mark.django_db
+class TestDosEnviosAlMismoTiempo:
+    """Bug iteracion-16 - Dos envíos al mismo tiempo, sin error del sistema."""
+
+    def test_the_second_one_says_it_is_already_pending(
+        self, authenticated_client, user, correo, mocker
+    ) -> None:
+        # La otra petición ya guardó la invitación, pero ésta no alcanzó a verla.
+        InvitationFactory(account=user, email="ana@estudio.mx")
+        mocker.patch("apps.team.services.pending_invitation", return_value=None)
+
+        response = authenticated_client.post(
+            URL, {"emails": ["ana@estudio.mx"]}, format="json"
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["skipped"] == [
+            {
+                "email": "ana@estudio.mx",
+                "reason": "Ya tiene una invitación pendiente; puedes reenviarla.",
+            }
+        ]
+        assert Invitation.objects.filter(account=user).count() == 1
+        correo.assert_not_called()

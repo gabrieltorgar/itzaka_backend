@@ -236,3 +236,48 @@ class TestPlans:
         resumen = authenticated_client.get(URL).data[0]
 
         assert resumen["document_updated_at"] == DOCUMENT["updatedAt"]
+
+
+@pytest.mark.django_db
+class TestElIdNoCambia:
+    """El id de un plano lo pone el editor al crearlo y una edición no lo cambia."""
+
+    @pytest.mark.parametrize("metodo", ["patch", "put"])
+    def test_an_edit_with_another_id_changes_nothing(
+        self, authenticated_client, user_factory, metodo
+    ) -> None:
+        from rest_framework.test import APIClient
+
+        ajena = APIClient()
+        ajena.force_authenticate(user=user_factory())
+        suyo = ajena.post(
+            URL, {"name": "Casa ajena", "document": DOCUMENT}, format="json"
+        ).data["id"]
+        mio = authenticated_client.post(
+            URL, {"name": "Mío", "document": DOCUMENT}, format="json"
+        ).data["id"]
+
+        response = getattr(authenticated_client, metodo)(
+            detail(mio),
+            {"id": suyo, "name": "Otro nombre", "document": DOCUMENT},
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "id" in response.data
+        assert ajena.get(detail(suyo)).data["name"] == "Casa ajena"
+        assert authenticated_client.get(detail(suyo)).status_code == 404
+
+    def test_sending_its_own_id_still_saves(self, authenticated_client) -> None:
+        mio = authenticated_client.post(
+            URL, {"name": "Mío", "document": DOCUMENT}, format="json"
+        ).data["id"]
+
+        response = authenticated_client.put(
+            detail(mio),
+            {"id": mio, "name": "Renombrado", "document": DOCUMENT},
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["name"] == "Renombrado"
