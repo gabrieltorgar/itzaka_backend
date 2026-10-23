@@ -74,7 +74,7 @@ class TestLosDatosDeLaEmpresa:
         response = como(colaborador).get(url)
 
         assert response.status_code == status.HTTP_200_OK
-        assert len(response.data) == 1
+        assert len(response.data["results"]) == 1
 
     def test_what_they_create_belongs_to_the_company(self, reyes, colaborador):
         admin, _ = reyes
@@ -111,7 +111,7 @@ class TestLosDatosDeLaEmpresa:
 
         assert detalle.status_code == status.HTTP_200_OK
         assert pagos.status_code == status.HTTP_200_OK
-        assert len(pagos.data) == 1
+        assert len(pagos.data["results"]) == 1
 
     def test_the_dashboard_is_the_company_one(self, reyes, colaborador) -> None:
         response = como(colaborador).get("/api/dashboard/")
@@ -158,8 +158,8 @@ class TestCambiarDeEmpresa:
         en_reyes = como(colaborador, reyes[0].id).get("/api/clients/")
         en_lumen = como(colaborador, otra.id).get("/api/clients/")
 
-        assert [c["name"] for c in en_reyes.data] == ["Constructora Reyes"]
-        assert [c["name"] for c in en_lumen.data] == ["Hostal Mirador"]
+        assert [c["name"] for c in en_reyes.data["results"]] == ["Constructora Reyes"]
+        assert [c["name"] for c in en_lumen.data["results"]] == ["Hostal Mirador"]
 
     def test_an_administrator_works_in_their_own_by_default(self, reyes) -> None:
         admin, _ = reyes
@@ -169,8 +169,8 @@ class TestCambiarDeEmpresa:
         propia = como(admin).get("/api/clients/")
         ajena = como(admin, otra.id).get("/api/clients/")
 
-        assert len(propia.data) == 1
-        assert ajena.data == []
+        assert len(propia.data["results"]) == 1
+        assert ajena.data["results"] == []
 
 
 @pytest.mark.django_db

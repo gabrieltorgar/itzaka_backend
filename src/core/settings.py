@@ -176,9 +176,15 @@ REST_FRAMEWORK = {
         "common.authentication.CookieJWTAuthentication",
     ),
     "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
-    "DEFAULT_FILTER_BACKENDS": ("django_filters.rest_framework.DjangoFilterBackend",),
-    # Pagina sólo si se pide (page/page_size) y nunca más de 100 por página.
-    "DEFAULT_PAGINATION_CLASS": "common.pagination.OptionalPageNumberPagination",
+    # El servidor filtra, busca (sin acentos) y ordena cada lista; la pantalla
+    # pide solo la página que muestra (api-lists-errors.md §1, iteracion-17).
+    "DEFAULT_FILTER_BACKENDS": (
+        "django_filters.rest_framework.DjangoFilterBackend",
+        "common.search.AccentInsensitiveSearchFilter",
+        "common.search.AccentInsensitiveOrderingFilter",
+    ),
+    # Siempre pagina: 20 por omisión y nunca más de 100 por página.
+    "DEFAULT_PAGINATION_CLASS": "common.pagination.DefaultPagination",
     "TEST_REQUEST_DEFAULT_FORMAT": "json",
     # Límites por dirección o por cuenta en todo, y uno propio en cada puerta
     # pública: sin tope, un código de seis dígitos se adivina probando.
@@ -198,6 +204,9 @@ REST_FRAMEWORK = {
         "documents": "30/hour",
         "invitations": "30/hour",
         "invitation": "30/min",
+        # Acciones en lote (common/bulk.py): cada una puede tocar hasta
+        # BULK_MAX_ITEMS registros, así que tienen su propio límite.
+        "bulk": "30/min",
     },
     # Detrás del proxy de Vercel, la dirección real es la del X-Forwarded-For.
     "NUM_PROXIES": env.int("NUM_PROXIES", default=1),
@@ -209,6 +218,13 @@ REST_FRAMEWORK = {
         + (("rest_framework.renderers.BrowsableAPIRenderer",) if DEBUG else ())
     ),
 }
+
+# --- Acciones en lote (common/bulk.py) ---
+# Cuántos registros toca una acción a la vez; el frontend repite el número
+# (src/types/api.ts) para no ofrecer «Seleccionar los N resultados» por encima.
+BULK_MAX_ITEMS = env.int("BULK_MAX_ITEMS", default=500)
+# Las costosas (mandan correo, generan documentos) tienen un tope menor.
+BULK_COSTLY_MAX_ITEMS = env.int("BULK_COSTLY_MAX_ITEMS", default=50)
 
 # --- Caché compartida (estado de los límites) ---
 # En Vercel cada invocación puede ser otra instancia: una caché en memoria no

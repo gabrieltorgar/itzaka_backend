@@ -226,6 +226,15 @@ Pendiente: la tabla sale de `uv run python src/manage.py api_routes --format md`
 
 <!-- /readme:auto:api -->
 
+Todas las listas paginan en el servidor: `?page=&page_size=` (20 por omisión,
+máximo 100) y responden `{count, next, previous, results}`. Cada una declara
+sus filtros (`filters.py` de su app; `?campo=a,b` para varios valores), su
+búsqueda (`?search=`, sin acentos ni mayúsculas) y su orden (`?ordering=`,
+con lista blanca y desempate por id). Las acciones sobre varios registros son
+`POST /api/<recurso>/bulk/<acción>/` con `{"ids": [...]}` o
+`{"select_all": true, "exclude_ids": [...]}` más la query string de la lista, y
+responden `{requested, processed, failed}` (`common/bulk.py`).
+
 ## Autenticación y sesión
 
 - Web: sesión con JWT en cookies `HttpOnly` que emite la API

@@ -1,15 +1,15 @@
-"""Paginación opcional y con tope (iteracion-12 #6)."""
+"""Paginación de todas las listas (iteracion-17 #1, api-lists-errors.md §1)."""
 
+from django.db.models import QuerySet
 from rest_framework.pagination import PageNumberPagination
 
 
-class OptionalPageNumberPagination(PageNumberPagination):
-    """Pagina sólo cuando se pide; nunca más de 100 por página.
+class DefaultPagination(PageNumberPagination):
+    """?page=&page_size= → {"count", "next", "previous", "results"}.
 
-    Las pantallas de hoy leen cada lista entera —una cuenta tiene decenas de
-    clientes, no miles—, así que sin ``page`` ni ``page_size`` la respuesta
-    conserva su forma de lista. Quien pide una página recibe ``count``,
-    ``next``, ``previous`` y ``results``, con ``page_size`` acotado a 100.
+    El servidor corta siempre la página: sin pedirla llegan las 20 primeras, y
+    nunca más de 100. La pantalla pide solo lo que muestra en lugar de bajar la
+    cuenta entera para paginarla en el navegador (US-77).
     """
 
     page_size = 20
@@ -17,10 +17,15 @@ class OptionalPageNumberPagination(PageNumberPagination):
     max_page_size = 100
 
     def paginate_queryset(self, queryset, request, view=None):
-        params = request.query_params
-        if (
-            self.page_query_param not in params
-            and self.page_size_query_param not in params
-        ):
-            return None
+        # Un ?ordering= del cliente reemplaza el orden de la vista y su
+        # desempate: sin la pk, las filas empatadas se repetirían o se
+        # perderían entre una página y la siguiente.
+        if isinstance(queryset, QuerySet):
+            ordering = tuple(queryset.query.order_by) or tuple(
+                queryset.model._meta.ordering
+            )
+            if not {"id", "-id", "pk", "-pk"} & {
+                o for o in ordering if isinstance(o, str)
+            }:
+                queryset = queryset.order_by(*ordering, "pk")
         return super().paginate_queryset(queryset, request, view)

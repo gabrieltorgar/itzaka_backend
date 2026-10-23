@@ -82,7 +82,7 @@ class TestPlanAssets:
 
         response = authenticated_client.get(URL)
 
-        assert {item["path"] for item in response.data} == {
+        assert {item["path"] for item in response.data["results"]} == {
             "sh3t/azulejo.png",
             "sh3f/silla.obj",
         }
@@ -123,7 +123,7 @@ class TestPlanAssets:
 
         response = authenticated_client.get(URL)
 
-        assert response.data == []
+        assert response.data["results"] == []
 
     def test_without_a_session_there_are_no_assets(self, api_client) -> None:
         """Caso de borde - Sin sesión no hay archivos."""

@@ -163,19 +163,19 @@ class TestTopesDeLoQueSePide:
         assert response.data["count"] == 105
         assert len(response.data["results"]) == 100
 
-    def test_without_asking_for_a_page_the_list_keeps_its_shape(
+    def test_without_asking_for_a_page_the_server_still_cuts_one(
         self, user, authenticated_client
     ):
-        """Caso de borde - Las pantallas de hoy leen la lista entera."""
+        """Caso de borde - Sin page ni page_size llega la primera página."""
         ClientFactory.create_batch(3, owner=user)
 
         response = authenticated_client.get("/api/clients/")
 
-        assert isinstance(response.data, list)
-        assert len(response.data) == 3
+        assert response.data["count"] == 3
+        assert len(response.data["results"]) == 3
 
     def test_the_request_body_has_an_explicit_cap(self) -> None:
         assert core_settings.DATA_UPLOAD_MAX_MEMORY_SIZE == 5 * 1024 * 1024
         assert core_settings.REST_FRAMEWORK["DEFAULT_PAGINATION_CLASS"] == (
-            "common.pagination.OptionalPageNumberPagination"
+            "common.pagination.DefaultPagination"
         )

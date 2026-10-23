@@ -3,6 +3,23 @@
 Todas las notas de cambios relevantes de la API. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es-ES/) y versionado semántico.
 
+## [Unreleased] — iteracion-17
+
+### Changed
+- **API — TEC Contrato de listas en el backend (US-77 · US-79):** todas las
+  listas paginan siempre: sin `page` llegan las 20 primeras con `count`,
+  `next`, `previous` y `results`, nunca más de 100 por página, y un desempate
+  por id evita filas repetidas o perdidas entre páginas. Antes, sin `page` la
+  lista llegaba entera como arreglo. Los filtros de django-filter, la búsqueda
+  y el orden quedan por omisión en todas las vistas; la búsqueda y el orden de
+  texto no distinguen acentos ni mayúsculas, igual en PostgreSQL que en SQLite
+  (`common/search.py`). `common/filters.py` da los filtros de varios valores
+  (`?status=a,b`) y `common/bulk.py` la base de las acciones en lote
+  (`POST /api/<recurso>/bulk/<acción>/`, hasta `BULK_MAX_ITEMS` = 500
+  registros, límite `bulk` de 30 por minuto).
+
+---
+
 ## [3.7.2] — 2026-10-22 · iteracion-16: bugs agrupados por gravedad
 
 ### Added
