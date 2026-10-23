@@ -7,11 +7,13 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 
+from apps.staff.filters import AssignmentFilter, WorkerFilter, WorkerPaymentFilter
 from apps.staff.selectors import (
     get_owned_worker,
     list_assignments_for_owner,
     list_worker_payments_for_owner,
-    list_workers_for_owner,
+    staff_totals,
+    worker_rows_for_owner,
     worker_totals,
 )
 from apps.staff.serializers import (
@@ -31,13 +33,29 @@ from apps.team.tenancy import account_of
 
 
 class WorkerViewSet(viewsets.ModelViewSet):
-    """CRUD del personal de la cuenta, con lo que hace y lo que se le debe."""
+    """CRUD del personal de la cuenta, con lo que hace y lo que se le debe.
+
+    La lista (US-96 · US-97, iteracion-17): ``?has_balance=true``, ``?kind=``,
+    ``?service=<id>`` (quienes hacen ese servicio) e ``?id=a,b``; busca por
+    nombre, teléfono, correo y los servicios que cobra; ordena por saldo o por
+    nombre, primero a quienes más se les debe.
+    """
 
     serializer_class = WorkerSerializer
     permission_classes = [IsAuthenticated]
+    filterset_class = WorkerFilter
+    search_fields = ("name", "phone", "email", "services__tariff__name")
+    ordering_fields = ("balance", "name")
+    ordering_text_fields = ("name",)
+    ordering = ("-balance", "name", "id")
 
     def get_queryset(self):
-        return list_workers_for_owner(owner=account_of(self.request))
+        return worker_rows_for_owner(owner=account_of(self.request))
+
+    @action(detail=False, methods=["get"])
+    def totals(self, request: Request) -> Response:
+        """GET /workers/totals/ — lo que se les debe y lo repartido, de todos."""
+        return Response(staff_totals(owner=account_of(request)))
 
     def perform_create(self, serializer) -> None:
         services = serializer.validated_data.pop("services", [])
@@ -62,12 +80,14 @@ class AssignmentViewSet(viewsets.ModelViewSet):
 
     serializer_class = AssignmentSerializer
     permission_classes = [IsAuthenticated]
+    # La lista (iteracion-17): por páginas, ``?project=`` y ``?worker=``.
+    filterset_class = AssignmentFilter
+    search_fields = ("worker__name", "quote_item__name")
+    ordering_fields = ("created_at", "quantity")
+    ordering = ("created_at", "id")
 
     def get_queryset(self):
-        return list_assignments_for_owner(
-            owner=account_of(self.request),
-            project_id=self.request.query_params.get("project"),
-        )
+        return list_assignments_for_owner(owner=account_of(self.request))
 
     def _hand_out(self, request: Request, payload: dict):
         serializer = AssignmentInputSerializer(
@@ -102,13 +122,15 @@ class WorkerPaymentViewSet(viewsets.ReadOnlyModelViewSet):
 
     serializer_class = WorkerPaymentSerializer
     permission_classes = [IsAuthenticated]
+    # La lista (iteracion-17): por páginas, ``?worker=`` y ``?project=``, en
+    # orden de fecha.
+    filterset_class = WorkerPaymentFilter
+    search_fields = ("worker__name", "note")
+    ordering_fields = ("date", "amount", "created_at")
+    ordering = ("date", "created_at", "id")
 
     def get_queryset(self):
-        return list_worker_payments_for_owner(
-            owner=account_of(self.request),
-            worker_id=self.request.query_params.get("worker"),
-            project_id=self.request.query_params.get("project"),
-        )
+        return list_worker_payments_for_owner(owner=account_of(self.request))
 
     def create(self, request: Request, *args, **kwargs) -> Response:
         serializer = WorkerPaymentInputSerializer(

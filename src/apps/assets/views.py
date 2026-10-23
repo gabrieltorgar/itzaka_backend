@@ -7,6 +7,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 
+from apps.assets.filters import PlanAssetFilter
 from apps.assets.selectors import (
     list_assets_for_owner,
     list_models_for_owner,
@@ -21,6 +22,7 @@ from apps.assets.serializers import (
 )
 from apps.assets.services import remove_models, store_asset, store_models
 from apps.team.tenancy import account_of
+from common.pagination import DefaultPagination
 
 
 class PlanAssetViewSet(viewsets.ReadOnlyModelViewSet):
@@ -28,6 +30,12 @@ class PlanAssetViewSet(viewsets.ReadOnlyModelViewSet):
 
     serializer_class = PlanAssetSerializer
     permission_classes = [IsAuthenticated]
+    # La lista (iteracion-17): por páginas —el dispositivo las recorre—, por
+    # clase y por ruta.
+    filterset_class = PlanAssetFilter
+    search_fields = ("path",)
+    ordering_fields = ("path", "created_at")
+    ordering = ("path", "id")
     # El binario llega como formulario; el cotejo de rutas, como JSON.
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
@@ -70,10 +78,15 @@ class CatalogModelViewSet(viewsets.ViewSet):
     permission_classes = [IsAuthenticated]
 
     def list(self, request: Request) -> Response:
-        """Las fichas que tiene la cuenta."""
-        return Response(
-            [row.fiche for row in list_models_for_owner(owner=account_of(request))]
-        )
+        """Las fichas que tiene la cuenta, por páginas (iteracion-17).
+
+        Una cuenta junta varias bibliotecas: el dispositivo recorre las páginas
+        en vez de recibir cientos de fichas en una sola respuesta.
+        """
+        paginator = DefaultPagination()
+        rows = list_models_for_owner(owner=account_of(request))
+        page = paginator.paginate_queryset(rows, request, view=self)
+        return paginator.get_paginated_response([row.fiche for row in page])
 
     def create(self, request: Request) -> Response:
         """Guarda un lote de fichas; las que ya estaban se reemplazan."""

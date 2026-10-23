@@ -1,7 +1,8 @@
 """Views de colaboradores: invitar y gestionar a quien trabaja en la empresa."""
 
 from django.middleware.csrf import get_token
-from rest_framework import status
+from rest_framework import serializers, status
+from rest_framework.exceptions import NotFound
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -11,7 +12,13 @@ from apps.accounts.serializers import UserAccountSerializer
 from apps.accounts.services import find_user, start_session
 from apps.legal.services import client_ip
 from apps.team.permissions import IsCompanyAdmin
-from apps.team.selectors import company_name, invitation_row, member_row, team_of
+from apps.team.selectors import (
+    DEFAULT_TEAM_ORDERING,
+    company_name,
+    invitation_row,
+    member_row,
+    team_of,
+)
 from apps.team.serializers import (
     AcceptInvitationSerializer,
     InvitationPreviewSerializer,
@@ -21,7 +28,9 @@ from apps.team.serializers import (
     TeamRowSerializer,
 )
 from apps.team.services import (
+    TEAM_BULK_ACTIONS,
     accept_invitation,
+    bulk_team_action,
     cancel_invitation,
     decoy_acceptance,
     find_invitation,
@@ -33,6 +42,8 @@ from apps.team.services import (
 )
 from apps.team.tenancy import account_of
 from common.auth_cookies import set_session_cookies
+from common.bulk import BulkSelectionSerializer, bulk_max_items
+from common.pagination import DefaultPagination
 from common.recaptcha import Verdict, guard_public_form
 
 
@@ -130,22 +141,80 @@ class InvitationAcceptView(APIView):
         return response
 
 
+def team_rows(request: Request) -> list[dict]:
+    """Las filas de la tabla como las pide la query string de la lista.
+
+    ``?search=`` busca en el correo; ``?status=a,b`` filtra por varios estados
+    (active, inactive, pending, expired); ``?ordering=`` es email, -email,
+    since o -since. La lista y sus acciones en lote leen lo mismo.
+    """
+    params = request.query_params
+    statuses = frozenset(
+        part.strip() for part in (params.get("status") or "").split(",") if part.strip()
+    )
+    return team_of(
+        account=account_of(request),
+        search=(params.get("search") or "").strip(),
+        statuses=statuses,
+        ordering=(params.get("ordering") or DEFAULT_TEAM_ORDERING).strip(),
+    )
+
+
 class TeamView(APIView):
     """GET /api/collaborators/ — colaboradores e invitaciones que esperan (US-138).
 
-    ``?search=`` busca en el correo; ``?status=`` filtra por estado (active,
-    inactive, pending, expired).
+    Por páginas, como toda lista (iteracion-17): ``{count, next, previous,
+    results}`` con ``?page=`` y ``?page_size=`` (20 por omisión, hasta 100).
     """
 
     permission_classes = [IsAuthenticated, IsCompanyAdmin]
 
     def get(self, request: Request) -> Response:
-        rows = team_of(
-            account=account_of(request),
-            search=(request.query_params.get("search") or "").strip(),
-            status=(request.query_params.get("status") or "").strip(),
+        paginator = DefaultPagination()
+        page = paginator.paginate_queryset(team_rows(request), request, view=self)
+        return paginator.get_paginated_response(TeamRowSerializer(page, many=True).data)
+
+
+class TeamBulkView(APIView):
+    """POST /api/collaborators/bulk/<acción>/ — activar, desactivar, quitar o
+    cancelar varios a la vez (US-138, iteracion-17).
+
+    El cuerpo trae los ids o «todos los resultados» con la query string de la
+    lista; la respuesta es ``{requested, processed, failed}``.
+    """
+
+    permission_classes = [IsAuthenticated, IsCompanyAdmin]
+    throttle_scope = "bulk"
+
+    def post(self, request: Request, action: str) -> Response:
+        if action not in TEAM_BULK_ACTIONS:
+            raise NotFound("Esa acción no existe.")
+        limit = bulk_max_items()
+        selection = BulkSelectionSerializer(
+            data=request.data, context={"max_items": limit}
         )
-        return Response(TeamRowSerializer(rows, many=True).data)
+        selection.is_valid(raise_exception=True)
+        data = selection.validated_data
+        if data["select_all"]:
+            excluded = {str(item) for item in data["exclude_ids"]}
+            ids = [
+                row["id"]
+                for row in team_rows(request)
+                if str(row["id"]) not in excluded
+            ]
+            if len(ids) > limit:
+                raise serializers.ValidationError(
+                    {
+                        "select_all": [
+                            f"La selección tiene {len(ids)} registros; el máximo por "
+                            f"acción es {limit}. Acota los filtros."
+                        ]
+                    }
+                )
+        else:
+            ids = data["ids"]
+        result = bulk_team_action(account=account_of(request), action=action, ids=ids)
+        return Response(result.as_dict())
 
 
 class MemberView(APIView):

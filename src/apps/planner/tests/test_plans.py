@@ -76,10 +76,10 @@ class TestPlans:
         listed = authenticated_client.get(URL)
 
         assert listed.status_code == status.HTTP_200_OK
-        assert len(listed.data) == 1
-        assert listed.data[0]["name"] == "Casa Reyes"
-        assert "updated_at" in listed.data[0]
-        assert "document" not in listed.data[0]
+        assert len(listed.data["results"]) == 1
+        assert listed.data["results"][0]["name"] == "Casa Reyes"
+        assert "updated_at" in listed.data["results"][0]
+        assert "document" not in listed.data["results"][0]
 
     def test_saving_again_replaces_the_document(self, authenticated_client) -> None:
         """Flujo principal - Guardar otra vez deja la versión nueva."""
@@ -110,7 +110,7 @@ class TestPlans:
         listed = authenticated_client.get(URL)
         opened = authenticated_client.get(detail(str(ajeno.pk)))
 
-        assert listed.data == []
+        assert listed.data["results"] == []
         assert opened.status_code == status.HTTP_404_NOT_FOUND
 
     def test_without_a_session_there_are_no_plans(self, api_client) -> None:
@@ -158,7 +158,7 @@ class TestPlans:
         removed = authenticated_client.delete(detail(created.data["id"]))
 
         assert removed.status_code == status.HTTP_204_NO_CONTENT
-        assert authenticated_client.get(URL).data == []
+        assert authenticated_client.get(URL).data["results"] == []
 
     def test_the_list_starts_with_the_one_touched_last(
         self, authenticated_client
@@ -176,7 +176,9 @@ class TestPlans:
             format="json",
         )
 
-        nombres = [plan["name"] for plan in authenticated_client.get(URL).data]
+        nombres = [
+            plan["name"] for plan in authenticated_client.get(URL).data["results"]
+        ]
 
         assert nombres == ["Primero", "Segundo"]
 
@@ -215,7 +217,7 @@ class TestPlans:
             URL, {"name": "Casa Reyes", "document": DOCUMENT}, format="json"
         )
 
-        resumen = authenticated_client.get(URL).data[0]
+        resumen = authenticated_client.get(URL).data["results"][0]
 
         assert resumen["document_updated_at"] == DOCUMENT["updatedAt"]
 
@@ -233,7 +235,7 @@ class TestPlans:
             URL, {"name": "Casa Reyes", "document": sobre}, format="json"
         )
 
-        resumen = authenticated_client.get(URL).data[0]
+        resumen = authenticated_client.get(URL).data["results"][0]
 
         assert resumen["document_updated_at"] == DOCUMENT["updatedAt"]
 

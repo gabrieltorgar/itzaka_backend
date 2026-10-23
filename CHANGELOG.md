@@ -3,6 +3,90 @@
 Todas las notas de cambios relevantes de la API. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es-ES/) y versionado semántico.
 
+## [3.8.0] — 2026-10-23 · iteracion-17: contrato de listas y acciones en lote
+
+### Added
+- **servicios — US-06 · US-110 El catálogo se pide por páginas y se borra en
+  lote:** `GET /api/tariffs/` filtra por tipo de unidad (`?unit_type=a,b`),
+  busca en nombre y descripción, ordena por nombre, precio o fecha de alta (por
+  omisión, de la A a la Z) y `?id=a,b` rotula un selector sin bajar el
+  catálogo. `POST /api/tariffs/bulk/delete/` borra la selección o todos los
+  resultados de la búsqueda; el que está en una cotización se queda y dice por
+  qué.
+- **clientes — US-09 · US-109 Los clientes se piden por páginas y se borran en
+  lote:** `GET /api/clients/` busca en nombre, teléfono y correo, filtra por
+  contacto (`?has_contact=true` o `false`), ordena por nombre o fecha de alta
+  (por omisión, de la A a la Z) y `?id=a,b` rotula un selector sin bajar la
+  lista. `POST /api/clients/bulk/delete/` borra la selección o todos los
+  resultados de la búsqueda; el que está en una cotización se queda y dice por
+  qué.
+- **cotizaciones — US-13 Las cotizaciones se piden por páginas:**
+  `GET /api/quotes/` filtra por estado (varios a la vez,
+  `?status=draft,in_project`) y por plano (`?plan=a,b`: las que salieron de
+  esos planos), busca por cliente y ordena por fecha, importe (`total`) o
+  cliente (`client_name`); por omisión, la más reciente. El importe y el
+  cliente se calculan en la consulta, así que ordenar por ellos abarca todas
+  las páginas.
+- **proyectos — US-67 La lista de proyectos sin avances ni fotos:**
+  `GET /api/projects/` entrega cada fila con su cliente, estado, cotizado,
+  avanzado y porcentaje, sin partidas, avances ni fotos; filtra por estado
+  (varios a la vez), busca por cliente y ordena por avance
+  (`progress_percentage`), cotizado (`quoted_value`) o cliente
+  (`client_name`); por omisión, el de menos avance. Lo cotizado y lo avanzado
+  se calculan en la consulta, cada uno en su subconsulta, así que ordenar
+  abarca todas las páginas. `GET /api/projects/{id}/` sigue trayendo el
+  proyecto completo.
+- **personal — US-96 · US-97 El personal se pide por páginas:**
+  `GET /api/workers/` busca en nombre, teléfono, correo y los servicios que
+  cobra; filtra por saldo (`?has_balance=true`), por tipo (`?kind=`) y por
+  quienes hacen un servicio (`?service=<id>`, para repartir una partida), y
+  ordena por saldo (`balance`) o por nombre; por omisión, primero a quien más
+  se le debe. El saldo se calcula en la consulta —lo ganado menos lo pagado,
+  nunca negativo—, así que filtrar y ordenar abarca todas las páginas.
+  `GET /api/workers/totals/` da lo que se les debe y lo repartido de toda la
+  cuenta.
+- **planos — US-78 Los planos por páginas y eliminar varios:**
+  `GET /api/plans/` busca por nombre y ordena por último cambio o por nombre
+  (por omisión, el último que se tocó); el dispositivo recorre los resúmenes
+  de cien en cien para ponerse al día. `POST /api/plans/bulk/delete/` elimina
+  varios; las cotizaciones que salieron de ellos se quedan, sin el enlace.
+- **colaboradores — US-138 Los colaboradores por páginas y en lote:**
+  `GET /api/collaborators/` entrega la tabla de colaboradores e invitaciones
+  por páginas, filtra por varios estados a la vez (`?status=pending,expired`),
+  busca en el correo y ordena por correo (por omisión, de la A a la Z) o por
+  desde cuándo. `POST /api/collaborators/bulk/<acción>/` activa, desactiva,
+  quita o cancela varios: la acción que no aplica a una fila —desactivar una
+  invitación, cancelar a un colaborador— dice por qué y las demás siguen.
+- **plataforma — TEC Pruebas base del contrato de listas:**
+  `tests/platform/test_list_contract.py` revisa cada vista que lista: que
+  pagine con `DefaultPagination`, declare sus filtros, su búsqueda y una lista
+  blanca de orden, y ordene por omisión con desempate por id; que las dos
+  listas que no son vistas genéricas (colaboradores y mobiliario) también
+  paginen, y que cada acción en lote tenga su límite `bulk`. Una vista nueva
+  que no cumpla el contrato deja la línea base en rojo. Las pruebas de
+  plataforma leen sus archivos en UTF-8: en Windows leían en cp1252.
+
+### Changed
+- **API — TEC Contrato de listas en el backend (US-77 · US-79):** todas las
+  listas paginan siempre: sin `page` llegan las 20 primeras con `count`,
+  `next`, `previous` y `results`, nunca más de 100 por página, y un desempate
+  por id evita filas repetidas o perdidas entre páginas. Antes, sin `page` la
+  lista llegaba entera como arreglo. Los filtros de django-filter, la búsqueda
+  y el orden quedan por omisión en todas las vistas; la búsqueda y el orden de
+  texto no distinguen acentos ni mayúsculas, igual en PostgreSQL que en SQLite
+  (`common/search.py`). `common/filters.py` da los filtros de varios valores
+  (`?status=a,b`) y `common/bulk.py` la base de las acciones en lote
+  (`POST /api/<recurso>/bulk/<acción>/`, hasta `BULK_MAX_ITEMS` = 500
+  registros, límite `bulk` de 30 por minuto).
+- **API — TEC Contrato de listas: las listas que no son una pantalla:** los
+  pagos de un proyecto, los avances, el reparto, los pagos al personal y los
+  archivos del editor declaran sus filtros —los mismos `?project=` y
+  `?worker=` de siempre, ahora validados: un id mal escrito es 400—, su
+  búsqueda y un orden estable. `GET /api/plan-models/` llega por páginas como
+  las demás listas; antes daba todas las fichas en un arreglo.
+
+---
+
 ## [3.7.2] — 2026-10-22 · iteracion-16: bugs agrupados por gravedad
 
 ### Added

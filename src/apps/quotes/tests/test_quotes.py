@@ -223,8 +223,8 @@ class TestListQuotes:
         response = authenticated_client.get(QUOTES_URL)
 
         assert response.status_code == status.HTTP_200_OK
-        assert len(response.data) == 1
-        row = response.data[0]
+        assert len(response.data["results"]) == 1
+        row = response.data["results"][0]
         assert row["client_name"] == "Constructora Reyes"
         assert Decimal(row["total"]) == Decimal("3500.00")
         assert row["status"] == Quote.Status.DRAFT
@@ -243,7 +243,7 @@ class TestListQuotes:
 
         response = authenticated_client.get(QUOTES_URL)
 
-        assert response.data == []
+        assert response.data["results"] == []
 
 
 @pytest.mark.django_db

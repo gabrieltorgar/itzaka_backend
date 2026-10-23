@@ -101,7 +101,7 @@ class TestListClients:
         response = authenticated_client.get(CLIENTS_URL)
 
         assert response.status_code == status.HTTP_200_OK
-        names = {c["name"] for c in response.data}
+        names = {c["name"] for c in response.data["results"]}
         assert names == {"Constructora Reyes"}
 
     def test_list_excludes_other_accounts_clients(
@@ -114,7 +114,7 @@ class TestListClients:
 
         response = authenticated_client.get(CLIENTS_URL)
 
-        names = {c["name"] for c in response.data}
+        names = {c["name"] for c in response.data["results"]}
         assert names == {"Constructora Reyes"}
 
 
@@ -167,7 +167,7 @@ class TestDeleteClient:
 
         response = authenticated_client.get(CLIENTS_URL)
 
-        counts = {c["name"]: c["quotes_count"] for c in response.data}
+        counts = {c["name"]: c["quotes_count"] for c in response.data["results"]}
         assert counts == {libre.name: 0, ocupado.name: 2}
 
     def test_another_accounts_client_is_not_found(

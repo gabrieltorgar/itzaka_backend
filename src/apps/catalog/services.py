@@ -2,9 +2,12 @@
 
 import logging
 
+from django.db import transaction
+from django.db.models import QuerySet
 from rest_framework.exceptions import ValidationError
 
 from apps.catalog.models import Tariff
+from common.bulk import BulkResult, error_text
 from common.wording import quotes_phrase
 
 logger = logging.getLogger("apps")
@@ -36,3 +39,26 @@ def delete_tariff(*, tariff: Tariff) -> None:
     tariff_id = str(tariff.pk)
     tariff.delete()
     logger.info("Tariff deleted", extra={"tariff_id": tariff_id})
+
+
+def delete_tariffs(*, tariffs: QuerySet[Tariff]) -> BulkResult:
+    """Borra en lote: cada servicio por su cuenta (US-110 en lote, iteracion-17).
+
+    El que está en una cotización se queda y su motivo va en ``failed``; los
+    demás se borran igual. Cada uno en su propio bloque atómico.
+    """
+    result = BulkResult()
+    for tariff in tariffs:
+        result.requested += 1
+        try:
+            with transaction.atomic():
+                delete_tariff(tariff=tariff)
+        except ValidationError as exc:
+            result.fail(tariff.pk, error_text(exc))
+        else:
+            result.processed += 1
+    logger.info(
+        "Tariffs deleted in bulk",
+        extra={"requested": result.requested, "processed": result.processed},
+    )
+    return result

@@ -95,18 +95,51 @@ class EvidenceSerializer(serializers.ModelSerializer):
         return absolute_media_url(obj.image, self.context.get("request"))
 
 
-class ProjectSerializer(serializers.ModelSerializer):
-    """Read shape of a project with quoted/advanced/percentage values."""
+class ProjectListSerializer(serializers.ModelSerializer):
+    """A row of the projects list: its values, no lines, progress or photos.
+
+    US-67 (iteracion-17): the list brings what the table shows; the progress
+    entries and their photos come with each project, on its own screen.
+    """
 
     client_name = serializers.CharField(source="quote.client.name", read_only=True)
     quoted_value = serializers.SerializerMethodField()
     advanced_value = serializers.SerializerMethodField()
     progress_percentage = serializers.SerializerMethodField()
-    items = serializers.SerializerMethodField()
-    progresses = serializers.SerializerMethodField()
 
     class Meta:
         model = Project
+        fields = [
+            "id",
+            "quote",
+            "client_name",
+            "status",
+            "quoted_value",
+            "advanced_value",
+            "progress_percentage",
+            "created_at",
+        ]
+
+    def get_quoted_value(self, obj: Project) -> Decimal:
+        return quoted_value(obj)
+
+    def get_advanced_value(self, obj: Project) -> Decimal:
+        return advanced_value(obj)
+
+    def get_progress_percentage(self, obj: Project) -> float:
+        quoted = quoted_value(obj)
+        if quoted == 0:
+            return 0.0
+        return round(float(advanced_value(obj) / quoted * 100), 2)
+
+
+class ProjectSerializer(ProjectListSerializer):
+    """Read shape of a project with quoted/advanced/percentage values."""
+
+    items = serializers.SerializerMethodField()
+    progresses = serializers.SerializerMethodField()
+
+    class Meta(ProjectListSerializer.Meta):
         fields = [
             "id",
             "quote",
@@ -165,15 +198,3 @@ class ProjectSerializer(serializers.ModelSerializer):
                 }
             )
         return items
-
-    def get_quoted_value(self, obj: Project) -> Decimal:
-        return quoted_value(obj)
-
-    def get_advanced_value(self, obj: Project) -> Decimal:
-        return advanced_value(obj)
-
-    def get_progress_percentage(self, obj: Project) -> float:
-        quoted = quoted_value(obj)
-        if quoted == 0:
-            return 0.0
-        return round(float(advanced_value(obj) / quoted * 100), 2)

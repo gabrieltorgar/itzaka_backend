@@ -164,7 +164,7 @@ class TestListTariffs:
         response = authenticated_client.get(TARIFFS_URL)
 
         assert response.status_code == status.HTTP_200_OK
-        names = {t["name"] for t in response.data}
+        names = {t["name"] for t in response.data["results"]}
         assert names == {"Muro de tablaroca", "Zócalo"}
 
     def test_list_excludes_other_accounts_tariffs(
@@ -177,7 +177,7 @@ class TestListTariffs:
 
         response = authenticated_client.get(TARIFFS_URL)
 
-        names = {t["name"] for t in response.data}
+        names = {t["name"] for t in response.data["results"]}
         assert names == {"Muro de tablaroca"}
         assert "Piso porcelanato" not in names
 
@@ -190,7 +190,7 @@ class TestListTariffs:
 
         response = authenticated_client.get(TARIFFS_URL)
 
-        names = {t["name"] for t in response.data}
+        names = {t["name"] for t in response.data["results"]}
         assert "Muro de tablaroca" in names
         assert "Detalle único" not in names
 
@@ -200,7 +200,7 @@ class TestListTariffs:
 
         response = authenticated_client.get(TARIFFS_URL)
 
-        row = next(t for t in response.data if t["name"] == "Muro")
+        row = next(t for t in response.data["results"] if t["name"] == "Muro")
         assert row["description"] == "Acabado fino"
 
 
@@ -264,5 +264,5 @@ class TestDeleteTariff:
 
         response = authenticated_client.get(TARIFFS_URL)
 
-        counts = {t["name"]: t["quotes_count"] for t in response.data}
+        counts = {t["name"]: t["quotes_count"] for t in response.data["results"]}
         assert counts == {libre.name: 0, usado.name: 1}

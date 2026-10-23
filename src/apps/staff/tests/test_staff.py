@@ -98,7 +98,7 @@ class TestWorkerRegistry:
 
         listado = authenticated_client.get(WORKERS_URL)
 
-        por_nombre = {w["name"]: w for w in listado.data}
+        por_nombre = {w["name"]: w for w in listado.data["results"]}
         assert len(por_nombre["Juan Pérez"]["services"]) == 2
         assert len(por_nombre["Luis Ramos"]["services"]) == 1
 
@@ -122,7 +122,7 @@ class TestWorkerRegistry:
 
         response = authenticated_client.get(WORKERS_URL)
 
-        assert [w["name"] for w in response.data] == []
+        assert [w["name"] for w in response.data["results"]] == []
 
 
 @pytest.mark.django_db

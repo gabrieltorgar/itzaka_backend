@@ -143,7 +143,7 @@ class TestLoAjenoNoExiste:
         response = authenticated_client.get(f"/api/plan-assets/{subido.data['id']}/")
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
-        assert authenticated_client.get("/api/plan-assets/").data == []
+        assert authenticated_client.get("/api/plan-assets/").data["results"] == []
 
 
 @pytest.mark.django_db
@@ -169,7 +169,7 @@ class TestPagosDeOtraCuenta:
         )
 
         assert response.status_code == status.HTTP_200_OK
-        assert response.data == []
+        assert response.data["results"] == []
 
     def test_a_payment_cannot_be_registered_on_another_project(
         self, authenticated_client, otra
