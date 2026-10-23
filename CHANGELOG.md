@@ -3,7 +3,7 @@
 Todas las notas de cambios relevantes de la API. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es-ES/) y versionado semántico.
 
-## [Unreleased] — iteracion-16
+## [3.7.2] — 2026-10-22 · iteracion-16: bugs agrupados por gravedad
 
 ### Added
 - **repositorio — TEC Archivos de trabajo del repositorio:** guía de
