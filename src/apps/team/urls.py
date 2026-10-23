@@ -9,11 +9,17 @@ from apps.team.views import (
     InvitationResendView,
     InvitationsView,
     MemberView,
+    TeamBulkView,
     TeamView,
 )
 
 urlpatterns = [
     path("collaborators/", TeamView.as_view(), name="team"),
+    path(
+        "collaborators/bulk/<str:action>/",
+        TeamBulkView.as_view(),
+        name="team-bulk",
+    ),
     path(
         "collaborators/members/<uuid:member_id>/",
         MemberView.as_view(),

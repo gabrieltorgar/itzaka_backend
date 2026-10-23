@@ -31,7 +31,7 @@ con su comprobante, hasta el cierre del proyecto con documento resumen.
 
 <!-- readme:auto:version -->
 
-**Versión:** 3.7.2 — `pyproject.toml` · historial en [CHANGELOG.md](CHANGELOG.md)
+**Versión:** 3.8.0 — `pyproject.toml` · historial en [CHANGELOG.md](CHANGELOG.md)
 
 <!-- /readme:auto:version -->
 
@@ -225,6 +225,15 @@ Cobertura mínima: **90 %** (`MIN_COVERAGE` del workflow). Una prueba en rojo, u
 Pendiente: la tabla sale de `uv run python src/manage.py api_routes --format md` (django-backend-conventions) al correr `readme_sync.py --write` con Django instalado.
 
 <!-- /readme:auto:api -->
+
+Todas las listas paginan en el servidor: `?page=&page_size=` (20 por omisión,
+máximo 100) y responden `{count, next, previous, results}`. Cada una declara
+sus filtros (`filters.py` de su app; `?campo=a,b` para varios valores), su
+búsqueda (`?search=`, sin acentos ni mayúsculas) y su orden (`?ordering=`,
+con lista blanca y desempate por id). Las acciones sobre varios registros son
+`POST /api/<recurso>/bulk/<acción>/` con `{"ids": [...]}` o
+`{"select_all": true, "exclude_ids": [...]}` más la query string de la lista, y
+responden `{requested, processed, failed}` (`common/bulk.py`).
 
 ## Autenticación y sesión
 

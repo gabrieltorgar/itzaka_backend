@@ -68,7 +68,7 @@ class TestLaTabla:
         response = como(admin).get(LISTA)
 
         assert response.status_code == status.HTTP_200_OK
-        filas = {fila["email"]: fila for fila in response.data}
+        filas = {fila["email"]: fila for fila in response.data["results"]}
         assert {e: f["status"] for e, f in filas.items()} == {
             "ana@estudio.mx": "active",
             "luis@obra.mx": "inactive",
@@ -78,7 +78,7 @@ class TestLaTabla:
         assert filas["ana@estudio.mx"]["kind"] == "member"
         assert filas["mar@despacho.mx"]["kind"] == "invitation"
         assert filas["mar@despacho.mx"]["expires_at"]
-        assert all(fila["since"] for fila in response.data)
+        assert all(fila["since"] for fila in response.data["results"])
 
     @pytest.mark.parametrize(
         ("params", "esperados"),
@@ -92,10 +92,10 @@ class TestLaTabla:
     def test_search_and_filter(self, admin, equipo, params, esperados) -> None:
         response = como(admin).get(LISTA, params)
 
-        assert {fila["email"] for fila in response.data} == esperados
+        assert {fila["email"] for fila in response.data["results"]} == esperados
 
     def test_without_collaborators_the_list_is_empty(self, admin) -> None:
-        assert como(admin).get(LISTA).data == []
+        assert como(admin).get(LISTA).data["results"] == []
 
     def test_a_collaborator_cannot_see_the_team(self, admin, equipo) -> None:
         response = como(equipo["activo"].user).get(LISTA)

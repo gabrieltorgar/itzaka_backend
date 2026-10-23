@@ -10,6 +10,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 
+from apps.quotes.filters import QuoteFilter
 from apps.quotes.selectors import list_quotes_for_owner
 from apps.quotes.serializers import (
     PlanSyncSerializer,
@@ -26,10 +27,21 @@ from apps.team.tenancy import account_of
 
 
 class QuoteViewSet(viewsets.ModelViewSet):
-    """CRUD for the account's quotes; totals are computed from line items."""
+    """CRUD for the account's quotes; totals are computed from line items.
+
+    The list (US-13, iteracion-17): ``?status=a,b``, ``?plan=a,b`` (the quotes
+    of those plans, US-133) and ``?id=a,b``; searches by client; orders by
+    date, amount or client, newest first by default. Each quote is also asked
+    for on its own (``GET /quotes/{id}/``), so no screen needs the whole list.
+    """
 
     serializer_class = QuoteSerializer
     permission_classes = [IsAuthenticated]
+    filterset_class = QuoteFilter
+    search_fields = ("client__name",)
+    ordering_fields = ("created_at", "total", "client_name")
+    ordering_text_fields = ("client_name",)
+    ordering = ("-created_at", "-id")
 
     def get_queryset(self):
         return list_quotes_for_owner(owner=account_of(self.request))

@@ -24,6 +24,7 @@ from apps.team.selectors import (
     is_member,
     pending_invitation,
 )
+from common.bulk import NOT_FOUND, BulkResult, error_text
 from common.mail import mask_email
 
 logger = logging.getLogger("apps")
@@ -409,6 +410,65 @@ def resend_invitation(*, account: User, invitation_id) -> Sent:
     invitation.expires_at = invitation.sent_at + timedelta(days=INVITATION_DAYS)
     invitation.save(update_fields=["token_hash", "sent_at", "expires_at"])
     return sent
+
+
+#: Las acciones en lote de la tabla de colaboradores (iteracion-17). Reenviar
+#: invitaciones en lote no está: sale con la iteración de seguridad.
+TEAM_BULK_ACTIONS = ("activate", "deactivate", "delete", "cancel")
+
+#: Por qué una acción de colaboradores no aplica a una invitación, y al revés.
+NOT_A_MEMBER = "Es una invitación, no un colaborador."
+NOT_AN_INVITATION = "Es un colaborador, no una invitación."
+
+
+def bulk_team_action(*, account: User, action: str, ids: list) -> BulkResult:
+    """Activa, desactiva, quita o cancela varios de la tabla a la vez (US-138).
+
+    Cada fila por su cuenta y en su propio bloque atómico: la que no es de esa
+    clase —desactivar una invitación, cancelar a un colaborador— o ya no está,
+    dice por qué en ``failed`` y las demás siguen.
+    """
+    result = BulkResult()
+    for item_id in ids:
+        result.requested += 1
+        membership = get_member(account=account, member_id=item_id)
+        invitation = (
+            None
+            if membership is not None
+            else get_invitation(account=account, invitation_id=item_id)
+        )
+        if membership is None and invitation is None:
+            result.fail(item_id, NOT_FOUND)
+            continue
+        try:
+            with transaction.atomic():
+                if action == "cancel":
+                    if invitation is None:
+                        raise ValidationError(NOT_AN_INVITATION)
+                    cancel_invitation(account=account, invitation_id=item_id)
+                elif membership is None:
+                    raise ValidationError(NOT_A_MEMBER)
+                elif action == "delete":
+                    remove_member(account=account, member_id=item_id)
+                else:
+                    set_member_active(
+                        account=account,
+                        member_id=item_id,
+                        is_active=action == "activate",
+                    )
+        except (ValidationError, NotFound) as exc:
+            result.fail(item_id, error_text(exc))
+        else:
+            result.processed += 1
+    logger.info(
+        "Team bulk action",
+        extra={
+            "action": action,
+            "requested": result.requested,
+            "processed": result.processed,
+        },
+    )
+    return result
 
 
 def cancel_invitation(*, account: User, invitation_id) -> None:

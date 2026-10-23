@@ -16,7 +16,7 @@ def test_views_hold_no_orm_queries():
     offenders = [
         f"{path.relative_to(SRC)}:{n}"
         for path in sorted((SRC / "apps").glob("*/views.py"))
-        for n, line in enumerate(path.read_text().splitlines(), 1)
+        for n, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1)
         if ".objects." in line
     ]
     assert not offenders, "las consultas van en selectors.py:\n" + "\n".join(
@@ -34,7 +34,7 @@ def test_data_belongs_to_the_company_not_to_whoever_asks():
     offenders = [
         f"{path.relative_to(SRC)}:{n}"
         for path in sorted((SRC / "apps").glob("*/views.py"))
-        for n, line in enumerate(path.read_text().splitlines(), 1)
+        for n, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1)
         if "owner=self.request.user" in line or "owner=request.user" in line
     ]
     assert not offenders, "usa account_of(request):\n" + "\n".join(offenders)
@@ -61,7 +61,7 @@ def test_requirements_txt_is_the_lockfile_exported():
     def body(text: str) -> list[str]:
         return [line for line in text.splitlines() if not line.startswith("#")]
 
-    committed = (REPO / "requirements.txt").read_text()
+    committed = (REPO / "requirements.txt").read_text(encoding="utf-8")
     assert body(committed) == body(exported), (
         "requirements.txt no coincide con uv.lock: corre "
         "`uv export --no-dev --no-hashes --no-emit-project "

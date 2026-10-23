@@ -10,13 +10,16 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 
 from apps.planner import photo_conversion
+from apps.planner.filters import PlanFilter
 from apps.planner.selectors import list_plans_for_owner
 from apps.planner.serializers import (
     PhotoInputSerializer,
     PlanSerializer,
     PlanSummarySerializer,
 )
+from apps.planner.services import delete_plans
 from apps.team.tenancy import account_of
+from common.bulk import BulkActionMixin
 
 
 class DailyPhotoLimitReached(APIException):
@@ -32,10 +35,21 @@ class PhotoServiceUnavailable(APIException):
     default_code = "photo_unavailable"
 
 
-class PlanViewSet(viewsets.ModelViewSet):
-    """CRUD for the authenticated account's plans (isolated per account)."""
+class PlanViewSet(BulkActionMixin, viewsets.ModelViewSet):
+    """CRUD for the authenticated account's plans (isolated per account).
+
+    The list (US-78, iteracion-17) is summaries without the document, by pages:
+    the device walks them a hundred at a time to catch up, and only downloads
+    the document of the plans it opens or that changed. It searches by name
+    and orders by last change or name, the one touched last first by default.
+    """
 
     permission_classes = [IsAuthenticated]
+    filterset_class = PlanFilter
+    search_fields = ("name",)
+    ordering_fields = ("updated_at", "name")
+    ordering_text_fields = ("name",)
+    ordering = ("-updated_at", "-id")
 
     def get_queryset(self):
         return list_plans_for_owner(owner=account_of(self.request))
@@ -45,6 +59,14 @@ class PlanViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer) -> None:
         serializer.save(owner=account_of(self.request))
+
+    @action(
+        detail=False, methods=["post"], url_path="bulk/delete", throttle_scope="bulk"
+    )
+    def bulk_delete(self, request):
+        """POST /api/plans/bulk/delete/[?<query string de la lista>] → BulkResult."""
+        plans = self.get_bulk_queryset(request)
+        return self.bulk_response(delete_plans(plans=plans))
 
     @action(
         detail=False,

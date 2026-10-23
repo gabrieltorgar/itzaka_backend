@@ -7,6 +7,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 
+from apps.payments.filters import PaymentFilter
 from apps.payments.selectors import get_owned_project, list_payments_for_owner
 from apps.payments.serializers import PaymentInputSerializer, PaymentSerializer
 from apps.payments.services import (
@@ -26,12 +27,15 @@ class PaymentViewSet(viewsets.ReadOnlyModelViewSet):
 
     serializer_class = PaymentSerializer
     permission_classes = [IsAuthenticated]
+    # La lista (iteracion-17): por páginas, ``?project=`` y en orden de fecha.
+    # Sin búsqueda: se piden los de un proyecto, no se buscan.
+    filterset_class = PaymentFilter
+    search_fields = ()
+    ordering_fields = ("date", "amount", "created_at")
+    ordering = ("date", "created_at", "id")
 
     def get_queryset(self):
-        project_id = self.request.query_params.get("project")
-        return list_payments_for_owner(
-            owner=account_of(self.request), project_id=project_id
-        )
+        return list_payments_for_owner(owner=account_of(self.request))
 
     def _get_project(self) -> Project:
         project_id = self.request.query_params.get("project")

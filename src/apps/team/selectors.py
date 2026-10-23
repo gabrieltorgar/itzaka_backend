@@ -48,26 +48,50 @@ def invitation_row(invitation: Invitation) -> dict:
     }
 
 
-def team_of(*, account: User, search: str = "", status: str = "") -> list[dict]:
+#: Cómo se ordena la tabla: por correo (de la A a la Z, por omisión) o desde
+#: cuándo. Lo que no está aquí no se ordena (iteracion-17).
+TEAM_ORDERINGS = {
+    "email": (lambda row: row["email"].lower(), False),
+    "-email": (lambda row: row["email"].lower(), True),
+    "since": (lambda row: row["since"], False),
+    "-since": (lambda row: row["since"], True),
+}
+DEFAULT_TEAM_ORDERING = "email"
+
+
+def team_of(
+    *,
+    account: User,
+    search: str = "",
+    statuses: frozenset[str] = frozenset(),
+    ordering: str = DEFAULT_TEAM_ORDERING,
+) -> list[dict]:
     """Quién colabora en la empresa y a quién se espera (US-138).
 
-    Primero los colaboradores, en el orden en que llegaron; después las
-    invitaciones pendientes o vencidas, la más reciente primero. Las aceptadas
-    ya son colaboradores y las canceladas no esperan a nadie.
+    Los colaboradores y las invitaciones pendientes o vencidas en una sola
+    tabla: las aceptadas ya son colaboradores y las canceladas no esperan a
+    nadie. ``statuses`` filtra por varios estados a la vez y ``ordering`` es uno
+    de ``TEAM_ORDERINGS``, con el id como desempate para que ninguna fila se
+    repita ni se pierda entre páginas (iteracion-17). Son dos tablas que no se
+    juntan en la base, y una empresa tiene decenas de colaboradores, no miles:
+    se juntan aquí y la vista las corta en páginas.
     """
-    members = (
-        Membership.objects.filter(account=account)
-        .select_related("user")
-        .order_by("created_at")
-    )
+    members = Membership.objects.filter(account=account).select_related("user")
     invitations = Invitation.objects.filter(
         account=account, status=Invitation.Status.PENDING
-    ).order_by("-sent_at")
+    )
     if search:
         members = members.filter(user__email__icontains=search)
         invitations = invitations.filter(email__icontains=search)
     rows = [member_row(m) for m in members] + [invitation_row(i) for i in invitations]
-    return [row for row in rows if not status or row["status"] == status]
+    if statuses:
+        rows = [row for row in rows if row["status"] in statuses]
+    key, descending = TEAM_ORDERINGS.get(
+        ordering, TEAM_ORDERINGS[DEFAULT_TEAM_ORDERING]
+    )
+    rows.sort(key=lambda row: str(row["id"]))
+    rows.sort(key=key, reverse=descending)
+    return rows
 
 
 def get_member(*, account: User, member_id) -> Membership | None:
