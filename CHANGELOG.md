@@ -36,6 +36,15 @@ Todas las notas de cambios relevantes de la API. El formato sigue
   se calculan en la consulta, cada uno en su subconsulta, así que ordenar
   abarca todas las páginas. `GET /api/projects/{id}/` sigue trayendo el
   proyecto completo.
+- **personal — US-96 · US-97 El personal se pide por páginas:**
+  `GET /api/workers/` busca en nombre, teléfono, correo y los servicios que
+  cobra; filtra por saldo (`?has_balance=true`), por tipo (`?kind=`) y por
+  quienes hacen un servicio (`?service=<id>`, para repartir una partida), y
+  ordena por saldo (`balance`) o por nombre; por omisión, primero a quien más
+  se le debe. El saldo se calcula en la consulta —lo ganado menos lo pagado,
+  nunca negativo—, así que filtrar y ordenar abarca todas las páginas.
+  `GET /api/workers/totals/` da lo que se les debe y lo repartido de toda la
+  cuenta.
 
 ### Changed
 - **API — TEC Contrato de listas en el backend (US-77 · US-79):** todas las

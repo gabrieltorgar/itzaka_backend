@@ -2,13 +2,24 @@
 
 from decimal import Decimal
 
-from django.db.models import QuerySet
+from django.db.models import (
+    DecimalField,
+    ExpressionWrapper,
+    F,
+    OuterRef,
+    QuerySet,
+    Subquery,
+    Sum,
+    Value,
+)
+from django.db.models.functions import Coalesce, Greatest
 
 from apps.projects.models import Progress, Project
 from apps.staff.models import Assignment, Worker, WorkerPayment
 from common.money import money
 
 ZERO = Decimal("0.00")
+MONEY_FIELD = DecimalField(max_digits=20, decimal_places=6)
 
 
 def list_workers_for_owner(*, owner) -> QuerySet[Worker]:
@@ -16,6 +27,71 @@ def list_workers_for_owner(*, owner) -> QuerySet[Worker]:
     return Worker.objects.filter(owner=owner).prefetch_related(
         "services__tariff", "assignments", "progresses", "payments"
     )
+
+
+def _money(subquery) -> Coalesce:
+    """A total from a subquery, zero when there is nothing to add."""
+    return Coalesce(
+        Subquery(subquery, output_field=MONEY_FIELD),
+        Decimal("0"),
+        output_field=MONEY_FIELD,
+    )
+
+
+def worker_rows_for_owner(*, owner) -> QuerySet[Worker]:
+    """The owner's staff with ``balance`` computed by the database.
+
+    What is owed today —accrued minus paid, never below zero, as
+    ``worker_totals`` says— so the list filters «con saldo» and orders by what
+    is owed across every page (US-96, iteracion-17). Accrued and paid are each
+    their own subquery: adding both in one join would multiply one by the other.
+    """
+    accrued = (
+        Progress.objects.filter(worker=OuterRef("pk"), labor_unit_price__isnull=False)
+        .order_by()
+        .values("worker")
+        .annotate(
+            total=Sum(
+                ExpressionWrapper(
+                    F("quantity") * F("labor_unit_price"), output_field=MONEY_FIELD
+                )
+            )
+        )
+        .values("total")
+    )
+    paid = (
+        WorkerPayment.objects.filter(worker=OuterRef("pk"))
+        .order_by()
+        .values("worker")
+        .annotate(total=Sum("amount"))
+        .values("total")
+    )
+    return (
+        list_workers_for_owner(owner=owner)
+        .annotate(accrued_total=_money(accrued), paid_total=_money(paid))
+        .annotate(
+            balance=Greatest(
+                F("accrued_total") - F("paid_total"),
+                Value(Decimal("0")),
+                output_field=MONEY_FIELD,
+            )
+        )
+    )
+
+
+def staff_totals(*, owner) -> dict:
+    """Lo que se le debe hoy a todo el personal y todo lo repartido (US-96).
+
+    The sum of each worker's own figures —the ones the list shows on its rows—
+    so the totals above the list are the whole account's, whatever page is on
+    screen (iteracion-17).
+    """
+    owed = committed = ZERO
+    for worker in list_workers_for_owner(owner=owner):
+        totals = worker_totals(worker)
+        owed += Decimal(totals["balance"])
+        committed += Decimal(totals["committed_value"])
+    return {"balance": money(owed), "committed_value": money(committed)}
 
 
 def get_owned_worker(*, owner, worker_id) -> Worker | None:
