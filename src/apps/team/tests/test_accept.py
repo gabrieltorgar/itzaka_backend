@@ -284,6 +284,30 @@ class TestFormularioPublico:
         assert not User.objects.filter(email="ana@estudio.mx").exists()
         assert "cuotreka_access" not in response.cookies
 
+    def test_a_filled_trap_answers_with_the_shape_of_a_success(
+        self, api_client, invitacion
+    ) -> None:
+        """Bug iteracion-16 - El campo trampa lleno no deja una sesión falsa.
+
+        La respuesta se ve como la de siempre —con la empresa a la que se
+        entra—, así que quien la lee no se rompe; la sesión no existe.
+        """
+        response = api_client.post(
+            aceptar("enlace-ana"),
+            {"password": PASSWORD, "website": "Estudio Reyes", **accepted()},
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_201_CREATED
+        assert set(response.data) == {"user", "company"}
+        assert response.data["company"]["id"]
+        assert response.data["company"]["name"] == "Estudio Reyes"
+        assert response.data["user"]["email"] == "ana@estudio.mx"
+        assert "cuotreka_access" not in response.cookies
+        invitacion.refresh_from_db()
+        assert invitacion.status == Invitation.Status.PENDING
+        assert not Membership.objects.exists()
+
     def test_a_low_score_is_refused(self, api_client, invitacion, settings, mocker):
         settings.RECAPTCHA_ENABLED = True
         settings.RECAPTCHA_SECRET_KEY = "secreta"
@@ -308,3 +332,25 @@ class TestFormularioPublico:
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert not User.objects.filter(email="ana@estudio.mx").exists()
+
+
+@pytest.mark.django_db
+class TestDosAlMismoTiempo:
+    """Bug iteracion-16 - Dos aceptaciones al mismo tiempo, sin error del sistema."""
+
+    def test_an_account_created_meanwhile_asks_for_its_password(
+        self, api_client, invitacion, mocker
+    ) -> None:
+        # La invitación de otra empresa al mismo correo acaba de crear la cuenta.
+        UserFactory(email="ana@estudio.mx")
+        mocker.patch("apps.team.services.find_user", return_value=None)
+
+        response = api_client.post(
+            aceptar("enlace-ana"), {"password": PASSWORD, **accepted()}, format="json"
+        )
+
+        assert response.status_code == status.HTTP_409_CONFLICT
+        assert "Ya existe una cuenta con este correo" in str(response.data["detail"])
+        invitacion.refresh_from_db()
+        assert invitacion.status == Invitation.Status.PENDING
+        assert not Membership.objects.exists()

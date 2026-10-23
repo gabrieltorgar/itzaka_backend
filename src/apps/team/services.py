@@ -3,10 +3,11 @@
 import hashlib
 import logging
 import secrets
+import uuid
 from dataclasses import dataclass, field
 from datetime import timedelta
 
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.exceptions import APIException, NotFound, ValidationError
@@ -14,9 +15,10 @@ from rest_framework.exceptions import APIException, NotFound, ValidationError
 from apps.accounts.models import User
 from apps.accounts.services import check_password_strength, find_user, normalize_email
 from apps.legal.services import record_acceptance
-from apps.team.emails import send_invitation_email
+from apps.team.emails import send_invitation_email, send_invitation_emails
 from apps.team.models import Invitation, Membership
 from apps.team.selectors import (
+    company_name,
     get_invitation,
     get_member,
     is_member,
@@ -28,6 +30,9 @@ logger = logging.getLogger("apps")
 
 #: Cuánto vale un enlace de invitación.
 INVITATION_DAYS = 7
+
+#: Por qué no sale una segunda invitación al mismo correo.
+ALREADY_PENDING = "Ya tiene una invitación pendiente; puedes reenviarla."
 
 
 def hash_token(token: str) -> str:
@@ -76,14 +81,18 @@ def _refresh_link(invitation: Invitation) -> str:
     return token
 
 
+@transaction.atomic
 def invite_collaborators(*, account: User, emails: list[str]) -> InviteResult:
     """Invita a cada correo a la empresa de ``account``.
 
     No se manda una segunda invitación a quien ya colabora o ya tiene una
-    vigente; una vencida se renueva. Si el correo no sale, la invitación queda
-    y se puede reenviar.
+    vigente; una vencida se renueva. Los correos salen en una sola tanda y en
+    la misma transacción que las invitaciones: si algo corta el envío a la
+    mitad, no queda ninguna pendiente sin su correo (iteracion-16). Si el
+    correo no sale, las invitaciones quedan y se pueden reenviar.
     """
     result = InviteResult()
+    links: list[tuple[Invitation, str]] = []
     seen: set[str] = set()
     for raw in emails:
         email = normalize_email(raw)
@@ -105,28 +114,40 @@ def invite_collaborators(*, account: User, emails: list[str]) -> InviteResult:
 
         invitation = pending_invitation(account=account, email=email)
         if invitation is not None and not invitation.is_expired:
-            result.skipped.append(
-                {
-                    "email": email,
-                    "reason": "Ya tiene una invitación pendiente; puedes reenviarla.",
-                }
-            )
+            result.skipped.append({"email": email, "reason": ALREADY_PENDING})
             continue
 
-        with transaction.atomic():
-            if invitation is None:
-                token, token_hash = _new_link()
-                now = timezone.now()
-                invitation = Invitation.objects.create(
-                    account=account,
-                    email=email,
-                    token_hash=token_hash,
-                    sent_at=now,
-                    expires_at=now + timedelta(days=INVITATION_DAYS),
-                )
-            else:
-                token = _refresh_link(invitation)
-        result.invited.append(_send(invitation, token))
+        if invitation is None:
+            token, token_hash = _new_link()
+            now = timezone.now()
+            try:
+                with transaction.atomic():
+                    invitation = Invitation.objects.create(
+                        account=account,
+                        email=email,
+                        token_hash=token_hash,
+                        sent_at=now,
+                        expires_at=now + timedelta(days=INVITATION_DAYS),
+                    )
+            except IntegrityError:
+                # Otra petición la acaba de guardar: es la misma invitación, no
+                # un error del sistema (iteracion-16).
+                result.skipped.append({"email": email, "reason": ALREADY_PENDING})
+                continue
+        else:
+            token = _refresh_link(invitation)
+        links.append((invitation, token))
+
+    if links:
+        sent = send_invitation_emails(
+            account=account,
+            links=[(invitation.email, token) for invitation, token in links],
+            days=INVITATION_DAYS,
+        )
+        logger.info("Invitations sent", extra={"count": len(links), "delivered": sent})
+        result.invited = [
+            Sent(invitation=invitation, email_sent=sent) for invitation, _ in links
+        ]
     return result
 
 
@@ -176,12 +197,48 @@ def _ensure_usable(invitation: Invitation) -> None:
         )
 
 
+class AccountJustCreated(APIException):
+    """La cuenta de ese correo nació mientras tanto: se entra con su contraseña."""
+
+    status_code = status.HTTP_409_CONFLICT
+    default_code = "account_exists"
+    default_detail = (
+        "Ya existe una cuenta con este correo. Vuelve a abrir la invitación y "
+        "entra con la contraseña de esa cuenta."
+    )
+
+
 @dataclass
 class Accepted:
     """Quién entró y a qué empresa se sumó."""
 
     user: User
     account: User
+
+
+def decoy_acceptance(*, token: str) -> dict:
+    """La respuesta a una aceptación descartada por el campo trampa.
+
+    Tiene la forma de una de verdad —la persona y la empresa a la que se
+    entra—, para que nadie la distinga ni se rompa quien la lee, pero no hay
+    cuenta ni sesión detrás (iteracion-16).
+    """
+    invitation = (
+        Invitation.objects.select_related("account")
+        .filter(token_hash=hash_token(token))
+        .first()
+    )
+    return {
+        "user": {
+            "id": str(uuid.uuid4()),
+            "email": invitation.email if invitation else "",
+            "is_email_verified": True,
+        },
+        "company": {
+            "id": str(uuid.uuid4()),
+            "name": company_name(account=invitation.account) if invitation else "",
+        },
+    }
 
 
 @transaction.atomic
@@ -203,6 +260,7 @@ def accept_invitation(
     Raises:
         NotFound, InvitationGone, InvitationUsed: el enlace no sirve.
         ValidationError: contraseña débil o equivocada, o faltan los documentos.
+        AccountJustCreated: la cuenta de ese correo nació mientras tanto.
     """
     invitation = find_invitation(token=token, lock=True)
     _ensure_usable(invitation)
@@ -222,12 +280,18 @@ def accept_invitation(
                 }
             )
         check_password_strength(password=password, user=User(email=invitation.email))
-        user = User.objects.create_user(
-            email=invitation.email,
-            password=password,
-            is_email_verified=True,
-            has_own_workspace=False,
-        )
+        try:
+            with transaction.atomic():
+                user = User.objects.create_user(
+                    email=invitation.email,
+                    password=password,
+                    is_email_verified=True,
+                    has_own_workspace=False,
+                )
+        except IntegrityError:
+            # La invitación de otra empresa al mismo correo la creó mientras
+            # tanto: ahora se entra con su contraseña (iteracion-16).
+            raise AccountJustCreated() from None
         record_acceptance(
             user=user,
             terms_version=terms_version,
@@ -307,14 +371,44 @@ def _owned_waiting_invitation(*, account: User, invitation_id) -> Invitation:
     return invitation
 
 
+class EmailNotSent(APIException):
+    """El correo no salió y nada cambió: el enlace anterior sigue sirviendo."""
+
+    status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+    default_code = "email_not_sent"
+
+    def __init__(self) -> None:
+        super().__init__(
+            {
+                "detail": (
+                    "No pudimos enviar el correo. El enlace anterior sigue "
+                    "sirviendo; intenta de nuevo en un momento."
+                ),
+                "code": "email_not_sent",
+            }
+        )
+
+
 def resend_invitation(*, account: User, invitation_id) -> Sent:
     """Reenviar una invitación pendiente o vencida (US-139).
 
-    Sale con un enlace nuevo que vale 7 días; el anterior deja de servir.
+    Sale con un enlace nuevo que vale 7 días, y el anterior deja de servir sólo
+    cuando el correo salió: si no sale, la persona se queda con el enlace que ya
+    tenía en vez de quedarse sin ninguno (iteracion-16).
+
+    Raises:
+        EmailNotSent: el correo no salió; la invitación quedó como estaba.
     """
     invitation = _owned_waiting_invitation(account=account, invitation_id=invitation_id)
-    token = _refresh_link(invitation)
-    return _send(invitation, token)
+    token, token_hash = _new_link()
+    sent = _send(invitation, token)
+    if not sent.email_sent:
+        raise EmailNotSent()
+    invitation.token_hash = token_hash
+    invitation.sent_at = timezone.now()
+    invitation.expires_at = invitation.sent_at + timedelta(days=INVITATION_DAYS)
+    invitation.save(update_fields=["token_hash", "sent_at", "expires_at"])
+    return sent
 
 
 def cancel_invitation(*, account: User, invitation_id) -> None:

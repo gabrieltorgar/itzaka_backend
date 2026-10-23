@@ -1,7 +1,5 @@
 """Views de colaboradores: invitar y gestionar a quien trabaja en la empresa."""
 
-import uuid
-
 from django.middleware.csrf import get_token
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -25,6 +23,7 @@ from apps.team.serializers import (
 from apps.team.services import (
     accept_invitation,
     cancel_invitation,
+    decoy_acceptance,
     find_invitation,
     invitation_state,
     invite_collaborators,
@@ -101,16 +100,10 @@ class InvitationAcceptView(APIView):
             remote_ip=client_ip(request),
         )
         if verdict is Verdict.DROP:
-            # La respuesta de siempre, sin cuenta ni sesión detrás.
+            # La respuesta de siempre, con la empresa como una de verdad, sin
+            # cuenta ni sesión detrás (iteracion-16).
             return Response(
-                {
-                    "user": {
-                        "id": str(uuid.uuid4()),
-                        "email": "",
-                        "is_email_verified": True,
-                    }
-                },
-                status=status.HTTP_201_CREATED,
+                decoy_acceptance(token=token), status=status.HTTP_201_CREATED
             )
 
         serializer = AcceptInvitationSerializer(data=request.data)
@@ -176,7 +169,11 @@ class MemberView(APIView):
 
 
 class InvitationResendView(APIView):
-    """POST /api/collaborators/invitations/<id>/resend/ — enlace nuevo (US-139)."""
+    """POST /api/collaborators/invitations/<id>/resend/ — enlace nuevo (US-139).
+
+    Responde la fila con ``email_sent``; si el correo no sale, 503 con
+    ``code: email_not_sent`` y el enlace anterior sigue sirviendo.
+    """
 
     permission_classes = [IsAuthenticated, IsCompanyAdmin]
     throttle_scope = "invitations"
@@ -185,7 +182,8 @@ class InvitationResendView(APIView):
         sent = resend_invitation(
             account=account_of(request), invitation_id=invitation_id
         )
-        return Response(TeamRowSerializer(invitation_row(sent.invitation)).data)
+        row = TeamRowSerializer(invitation_row(sent.invitation)).data
+        return Response({**row, "email_sent": sent.email_sent})
 
 
 class InvitationCancelView(APIView):

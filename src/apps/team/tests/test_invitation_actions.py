@@ -80,6 +80,36 @@ class TestReenviar:
         token = html.split("/invitacion/")[1].split('"')[0]
         assert hash_token(token) == invitacion.token_hash
 
+    def test_the_answer_says_the_email_went_out(self, admin, equipo, correo) -> None:
+        """Bug iteracion-16 - Se dice si el correo salió."""
+        response = como(admin).post(reenviar(equipo["pendiente"].id))
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["email_sent"] is True
+
+    def test_if_the_email_does_not_go_out_the_old_link_still_works(
+        self, admin, correo
+    ) -> None:
+        """Bug iteracion-16 - Si el correo no sale, el enlace anterior sigue."""
+        invitacion = InvitationFactory(
+            account=admin, email="mar@despacho.mx", token="enlace-de-mar"
+        )
+        vence = invitacion.expires_at
+        correo.return_value = False
+
+        response = como(admin).post(reenviar(invitacion.id))
+
+        assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
+        assert response.data["code"] == "email_not_sent"
+        assert "enlace anterior sigue" in str(response.data["detail"])
+        invitacion.refresh_from_db()
+        assert invitacion.token_hash == hash_token("enlace-de-mar")
+        assert invitacion.expires_at == vence
+        # Quien ya tenía el correo de antes sigue entrando con su enlace.
+        detalle = APIClient().get("/api/invitations/enlace-de-mar/")
+        assert detalle.status_code == status.HTTP_200_OK
+        assert detalle.data["status"] == "pending"
+
     def test_an_accepted_invitation_is_not_resent(self, admin, correo) -> None:
         aceptada = InvitationFactory(account=admin, status="accepted")
 
