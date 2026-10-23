@@ -45,6 +45,11 @@ Todas las notas de cambios relevantes de la API. El formato sigue
   nunca negativo—, así que filtrar y ordenar abarca todas las páginas.
   `GET /api/workers/totals/` da lo que se les debe y lo repartido de toda la
   cuenta.
+- **planos — US-78 Los planos por páginas y eliminar varios:**
+  `GET /api/plans/` busca por nombre y ordena por último cambio o por nombre
+  (por omisión, el último que se tocó); el dispositivo recorre los resúmenes
+  de cien en cien para ponerse al día. `POST /api/plans/bulk/delete/` elimina
+  varios; las cotizaciones que salieron de ellos se quedan, sin el enlace.
 
 ### Changed
 - **API — TEC Contrato de listas en el backend (US-77 · US-79):** todas las
