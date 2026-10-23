@@ -13,6 +13,13 @@ Todas las notas de cambios relevantes de la API. El formato sigue
   catálogo. `POST /api/tariffs/bulk/delete/` borra la selección o todos los
   resultados de la búsqueda; el que está en una cotización se queda y dice por
   qué.
+- **clientes — US-09 · US-109 Los clientes se piden por páginas y se borran en
+  lote:** `GET /api/clients/` busca en nombre, teléfono y correo, filtra por
+  contacto (`?has_contact=true` o `false`), ordena por nombre o fecha de alta
+  (por omisión, de la A a la Z) y `?id=a,b` rotula un selector sin bajar la
+  lista. `POST /api/clients/bulk/delete/` borra la selección o todos los
+  resultados de la búsqueda; el que está en una cotización se queda y dice por
+  qué.
 
 ### Changed
 - **API — TEC Contrato de listas en el backend (US-77 · US-79):** todas las
