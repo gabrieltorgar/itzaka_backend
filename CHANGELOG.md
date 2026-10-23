@@ -50,6 +50,13 @@ Todas las notas de cambios relevantes de la API. El formato sigue
   (por omisión, el último que se tocó); el dispositivo recorre los resúmenes
   de cien en cien para ponerse al día. `POST /api/plans/bulk/delete/` elimina
   varios; las cotizaciones que salieron de ellos se quedan, sin el enlace.
+- **colaboradores — US-138 Los colaboradores por páginas y en lote:**
+  `GET /api/collaborators/` entrega la tabla de colaboradores e invitaciones
+  por páginas, filtra por varios estados a la vez (`?status=pending,expired`),
+  busca en el correo y ordena por correo (por omisión, de la A a la Z) o por
+  desde cuándo. `POST /api/collaborators/bulk/<acción>/` activa, desactiva,
+  quita o cancela varios: la acción que no aplica a una fila —desactivar una
+  invitación, cancelar a un colaborador— dice por qué y las demás siguen.
 
 ### Changed
 - **API — TEC Contrato de listas en el backend (US-77 · US-79):** todas las

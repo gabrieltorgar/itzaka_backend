@@ -135,7 +135,8 @@ class TestCancelar:
         assert response.status_code == status.HTTP_204_NO_CONTENT
         invitacion.refresh_from_db()
         assert invitacion.status == Invitation.Status.CANCELLED
-        assert "mar@despacho.mx" not in {fila["email"] for fila in tabla.data}
+        filas = tabla.data["results"]
+        assert "mar@despacho.mx" not in {fila["email"] for fila in filas}
 
     def test_an_accepted_invitation_cannot_be_cancelled(self, admin) -> None:
         aceptada = InvitationFactory(account=admin, status="accepted")
