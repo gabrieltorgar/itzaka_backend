@@ -97,7 +97,7 @@ pydantic-core==2.50.1
     # via pydantic
 pyjwt==2.15.1
     # via djangorestframework-simplejwt
-python-dateutil==2.9.0.post0
+python-dateutil==3.0.0
     # via botocore
 s3transfer==0.19.2
     # via boto3
