@@ -1,10 +1,14 @@
 """Django Unfold admin configuration (iteracion-13; paleta de piedra, iteracion-20)."""
 
+from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 
 UNFOLD = {
     "SITE_TITLE": _("Itzaka Admin"),
     "SITE_HEADER": _("Itzaka"),
+    # Un callable: settings_unfold no puede importar APP_VERSION (circular);
+    # templates/admin/login.html lo repite en el acceso.
+    "SITE_SUBHEADER": lambda request: f"v{settings.APP_VERSION}",
     "SITE_URL": "/",
     "SHOW_HISTORY": True,
     "SHOW_VIEW_ON_SITE": True,

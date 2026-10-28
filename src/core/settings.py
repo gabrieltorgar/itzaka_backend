@@ -5,6 +5,7 @@ Modular settings: this file holds Django's own config and initializes
 library with significant config gets its own ``settings_<name>.py``.
 """
 
+import tomllib
 from datetime import timedelta
 from pathlib import Path
 
@@ -13,6 +14,11 @@ from corsheaders.defaults import default_headers
 
 # BASE_DIR = repo root (parents: settings.py -> core -> src -> repo)
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# The release number lives only in pyproject.toml ([project].version): git-deploy-ops
+# set_version.py bumps it in the «Versión X.Y.Z» commit. Never a literal (DOC-VER02).
+with (BASE_DIR.parent / "pyproject.toml").open("rb") as pyproject:
+    APP_VERSION: str = tomllib.load(pyproject)["project"]["version"]
 
 env = environ.Env(
     DEBUG=(bool, True),
@@ -123,7 +129,7 @@ ROOT_URLCONF = "core.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        "DIRS": [BASE_DIR / "templates"],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [

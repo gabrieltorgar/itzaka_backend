@@ -1,0 +1,7 @@
+{% extends "admin/login.html" %}
+{# Unfold's login + the version under the form (Django skips this file when it resolves the same name); site_subheader is UNFOLD["SITE_SUBHEADER"] #}
+
+{% block login_after %}
+    {{ block.super }}
+    <p class="mt-6 text-center text-subtle text-xs">{{ site_subheader }}</p>
+{% endblock %}

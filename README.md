@@ -189,6 +189,7 @@ Cobertura mínima: **90 %** (`MIN_COVERAGE` del workflow). Una prueba en rojo, u
 | `src/apps/` | Apps de dominio (tabla abajo) |
 | `src/common/` | Código compartido: modelos abstractos, permisos, paginación, filtros, acciones masivas, errores |
 | `src/core/` | Settings, URLs, WSGI/ASGI y middleware |
+| `src/templates/` | Plantillas |
 | `src/tests/` | Pruebas de plataforma (línea base) |
 | `scripts/` | Scripts vendorizados (quality gate, README) y de build |
 | `.github/workflows/` | CI |
