@@ -9,7 +9,7 @@ from common.emails import render_code_email, render_email
 #: Qué dice cada código, según para qué sirve.
 _COPY = {
     OtpCode.Purpose.SIGNUP: (
-        "Tu código de CUOTREKA",
+        "Tu código de Itzaka",
         "Tu código de verificación",
         "Escribe este código para terminar de crear tu cuenta.",
     ),
@@ -19,7 +19,7 @@ _COPY = {
         "Escribe este código para poder fijar tu contraseña nueva.",
     ),
     OtpCode.Purpose.EMAIL_CHANGE: (
-        "Confirma tu correo nuevo en CUOTREKA",
+        "Confirma tu correo nuevo en Itzaka",
         "Confirma tu correo nuevo",
         "Escribe este código en tu perfil para que tu cuenta use este correo.",
     ),
@@ -36,7 +36,7 @@ def send_otp_email(
 ) -> bool:
     """Le hace llegar su código a quien se está dando de alta o recuperando.
 
-    Va con la marca de CUOTREKA y no con la de la organización: quien lo
+    Va con la marca de Itzaka y no con la de la organización: quien lo
     recibe es el arquitecto, no su cliente, y lo que está haciendo es entrar a
     la herramienta.
     """
@@ -64,14 +64,14 @@ def send_email_changed_notice(*, old_email: str, new_email: str) -> bool:
         brand=house_brand(),
         title="Tu cuenta cambió de correo",
         intro=(
-            f"Tu cuenta de CUOTREKA ahora usa {new_email} para entrar. "
+            f"Tu cuenta de Itzaka ahora usa {new_email} para entrar. "
             "Este correo ya no sirve para iniciar sesión."
         ),
         note=(
             "Si no fuiste tú, responde a este mensaje o escríbenos desde el "
-            "formulario de contacto de CUOTREKA."
+            "formulario de contacto de Itzaka."
         ),
     )
     return mail.send_email(
-        to=old_email, subject="Tu cuenta de CUOTREKA cambió de correo", html=html
+        to=old_email, subject="Tu cuenta de Itzaka cambió de correo", html=html
     )

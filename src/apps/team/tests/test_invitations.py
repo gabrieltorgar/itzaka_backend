@@ -285,7 +285,7 @@ class TestTanda:
 
 
 class TestEnlaceDeLaMarca:
-    """Sin APP_BASE_URL configurada, el enlace va al dominio de CUOTREKA."""
+    """Sin APP_BASE_URL configurada, el enlace va al dominio de Itzaka."""
 
     def test_the_default_base_url_is_the_brand_domain(self) -> None:
         entorno = {k: v for k, v in os.environ.items() if k != "APP_BASE_URL"}

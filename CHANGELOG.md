@@ -1,7 +1,12 @@
-# Changelog — CUOTREKA (backend)
+# Changelog — Itzaka (backend)
 
 Todas las notas de cambios relevantes de la API. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es-ES/) y versionado semántico.
+
+## [Unreleased] — En curso
+
+### Changed
+- **marca — TEC Marca v2.0 — El producto se llama Itzaka**: Cuotreka pasa a llamarse Itzaka, una solución de Grupo Torres Muciño. Asuntos y firma de los correos («Este mensaje se generó desde Itzaka, una solución de Grupo Torres Muciño.»), «optimizado por Itzaka», admin «Itzaka Admin», remitente por omisión «Itzaka». Términos y privacidad en su versión 2026-10-28 con el nombre nuevo y la nota «Itzaka antes se llamaba Cuotreka (y antes, presuplano)»: todas las cuentas los vuelven a aceptar. Las cookies de la sesión pasan a `itzaka_access` / `itzaka_refresh`; las de antes (`cuotreka_*`) se siguen leyendo y se borran al renovar o salir, así nadie pierde su sesión. La tabla de caché pasa a `itzaka_cache` (la crea `createcachetable` en el build; la anterior queda sin uso). Paquete `itzaka-backend`. accounts 0012: solo el texto de ayuda del nombre de la organización.
 
 ## [3.8.0] — 2026-10-23 · iteracion-17: contrato de listas y acciones en lote
 

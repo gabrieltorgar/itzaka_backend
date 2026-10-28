@@ -30,10 +30,10 @@ class TestPasswordReset:
         pregunta por mil correos sabría cuáles tienen cuenta.
         """
         conocido = api_client.post(
-            REQUEST_URL, {"email": "otra@cuotreka.test"}, format="json"
+            REQUEST_URL, {"email": "otra@itzaka.test"}, format="json"
         )
         desconocido = api_client.post(
-            REQUEST_URL, {"email": "nadie@cuotreka.test"}, format="json"
+            REQUEST_URL, {"email": "nadie@itzaka.test"}, format="json"
         )
 
         assert conocido.status_code == desconocido.status_code == status.HTTP_200_OK
@@ -78,7 +78,7 @@ class TestPasswordReset:
         )
 
         assert entrada.status_code == status.HTTP_200_OK
-        assert entrada.cookies["cuotreka_access"].value
+        assert entrada.cookies["itzaka_access"].value
 
     def test_a_wrong_code_changes_nothing(self, api_client, user) -> None:
         """Caso alternativo - Un código inválido no cambia la contraseña."""
@@ -97,7 +97,7 @@ class TestPasswordReset:
         response = api_client.post(
             CONFIRM_URL,
             {
-                "email": "nadie@cuotreka.test",
+                "email": "nadie@itzaka.test",
                 "code": str(settings.OTP_UNIVERSAL_CODE),
                 "password": "nuevaclave123",
             },

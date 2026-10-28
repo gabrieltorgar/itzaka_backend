@@ -1,4 +1,4 @@
-"""Django settings for CUOTREKA backend.
+"""Django settings for Itzaka backend.
 
 Modular settings: this file holds Django's own config and initializes
 ``environ`` once. STATIC/MEDIA/security live in ``core.env``; each third-party
@@ -233,7 +233,7 @@ BULK_COSTLY_MAX_ITEMS = env.int("BULK_COSTLY_MAX_ITEMS", default=50)
 CACHES = {
     "default": {
         "BACKEND": "django.core.cache.backends.db.DatabaseCache",
-        "LOCATION": "cuotreka_cache",
+        "LOCATION": "itzaka_cache",
     }
 }
 
@@ -281,7 +281,7 @@ DOCUMENT_EMAIL_MAX_BYTES = env.int("DOCUMENT_EMAIL_MAX_BYTES", default=8 * 1024 
 # Se recortan: un salto de línea o un espacio pegado al pegar el valor
 # invalida la llave —Resend contesta 401— sin que se vea en ningún lado.
 RESEND_API_KEY = env.str("RESEND_API_KEY", default="").strip()
-RESEND_FROM = env.str("RESEND_FROM", default="CUOTREKA <onboarding@resend.dev>").strip()
+RESEND_FROM = env.str("RESEND_FROM", default="Itzaka <onboarding@resend.dev>").strip()
 # Producción no sale sin correo (iteracion-16): sin la llave, o con el remitente
 # de prueba de Resend, `migrate` —parte del build— se detiene (common/checks.py)
 # y un correo que no puede salir queda como error, no como aviso.

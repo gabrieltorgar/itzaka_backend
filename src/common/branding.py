@@ -1,9 +1,9 @@
-"""Con qué cara sale un correo: la de la organización, o la de CUOTREKA.
+"""Con qué cara sale un correo: la de la organización, o la de Itzaka.
 
 Es la misma regla que ya siguen los PDF —el membrete manda cuando está
 configurado— con una diferencia que pidió el negocio: cuando el documento sale
-con la marca del arquitecto, el pie dice que va «optimizado por CUOTREKA».
-Cuando la cuenta no ha configurado nada, el correo es de CUOTREKA y ese pie
+con la marca del arquitecto, el pie dice que va «optimizado por Itzaka».
+Cuando la cuenta no ha configurado nada, el correo es de Itzaka y ese pie
 sobraría.
 """
 
@@ -28,7 +28,7 @@ class Brand:
     name: str
     color: str
     logo_url: str
-    #: Si el pie lleva el «optimizado por CUOTREKA».
+    #: Si el pie lleva el «optimizado por Itzaka».
     optimized: bool
 
 

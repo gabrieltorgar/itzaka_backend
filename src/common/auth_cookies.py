@@ -5,14 +5,21 @@ un XSS o una extensión ya no se llevan la sesión. El access viaja a toda la AP
 el refresh, sólo a las rutas de la sesión. SameSite=Lax, y Secure fuera de
 desarrollo. La SPA llega a la API por su mismo dominio (un rewrite de Vercel),
 así que son cookies propias, no de terceros.
+
+Las cookies se llamaban como el nombre anterior (Cuotreka). Las de antes se
+siguen leyendo para que nadie pierda su sesión con el cambio de marca
+(iteracion-20), y se borran en cuanto la sesión se renueva o se cierra.
 """
 
 from django.conf import settings
 from django.http import HttpResponse
 from rest_framework_simplejwt.tokens import RefreshToken
 
-ACCESS_COOKIE = "cuotreka_access"
-REFRESH_COOKIE = "cuotreka_refresh"
+ACCESS_COOKIE = "itzaka_access"
+REFRESH_COOKIE = "itzaka_refresh"
+#: Los nombres de antes del cambio de marca: solo se leen y se borran.
+LEGACY_ACCESS_COOKIE = "cuotreka_access"
+LEGACY_REFRESH_COOKIE = "cuotreka_refresh"
 ACCESS_PATH = "/api/"
 REFRESH_PATH = "/api/auth/"
 
@@ -31,9 +38,29 @@ def _cookie(
     )
 
 
+def access_from(request) -> str | None:
+    """El access de la cookie, con el nombre de ahora o el de antes."""
+    return request.COOKIES.get(ACCESS_COOKIE) or request.COOKIES.get(
+        LEGACY_ACCESS_COOKIE
+    )
+
+
+def refresh_from(request) -> str | None:
+    """El refresh de la cookie, con el nombre de ahora o el de antes."""
+    return request.COOKIES.get(REFRESH_COOKIE) or request.COOKIES.get(
+        LEGACY_REFRESH_COOKIE
+    )
+
+
+def _clear_legacy_cookies(response: HttpResponse) -> None:
+    response.delete_cookie(LEGACY_ACCESS_COOKIE, path=ACCESS_PATH, samesite="Lax")
+    response.delete_cookie(LEGACY_REFRESH_COOKIE, path=REFRESH_PATH, samesite="Lax")
+
+
 def set_token_cookies(response: HttpResponse, *, access: str, refresh: str) -> None:
     """Pone en las cookies un par de tokens ya emitido (al renovar, por ejemplo)."""
     jwt = settings.SIMPLE_JWT
+    _clear_legacy_cookies(response)
     _cookie(
         response,
         ACCESS_COOKIE,
@@ -59,3 +86,4 @@ def clear_session_cookies(response: HttpResponse) -> None:
     """Borra las cookies de la sesión."""
     response.delete_cookie(ACCESS_COOKIE, path=ACCESS_PATH, samesite="Lax")
     response.delete_cookie(REFRESH_COOKIE, path=REFRESH_PATH, samesite="Lax")
+    _clear_legacy_cookies(response)

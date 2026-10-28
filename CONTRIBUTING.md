@@ -3,7 +3,7 @@ Plantilla de git-deploy-ops (assets/agents/CONTRIBUTING.md). GitHub la muestra c
 o docs/). Es solo un puntero para personas: las reglas viven en .claude/rules/contribucion.md, que los agentes cargan
 solos y que las personas leen igual. No copies reglas aquí.
 -->
-# Contribuir a CUOTREKA (backend)
+# Contribuir a Itzaka (backend)
 
 Este repositorio sigue el flujo de entrega del equipo: `main` y `develop` protegidas, pull requests que solo se fusionan con todas las pruebas en verde y la cobertura mínima, y un commit por historia de usuario o item con sus pruebas, su CHANGELOG y su README.
 

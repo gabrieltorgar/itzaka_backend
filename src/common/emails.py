@@ -7,10 +7,11 @@ estilos y ninguno entiende flexbox.
 
 from html import escape
 
+from common.brand import BRAND_NAME, GROUP_SIGNATURE
 from common.branding import OPTIMIZED_BY, Brand
 
 #: El pie que llevan todos: qué es esto y de dónde salió.
-SIGNATURE = "Este mensaje se generó desde CUOTREKA."
+SIGNATURE = f"Este mensaje se generó desde {BRAND_NAME}, {GROUP_SIGNATURE}."
 
 
 def _row(label: str, value: str) -> str:

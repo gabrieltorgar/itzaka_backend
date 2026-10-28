@@ -133,7 +133,7 @@ class Organization(models.Model):
 
     Accounts are one-person workspaces, so this is not a tenancy boundary —
     it is the letterhead. It stays optional: with no name the documents are
-    signed by CUOTREKA itself, which is how every account started.
+    signed by Itzaka itself, which is how every account started.
     """
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -148,7 +148,7 @@ class Organization(models.Model):
         blank=True,
         default="",
         verbose_name=_("nombre"),
-        help_text=_("Nombre que llevan los documentos; vacío los firma CUOTREKA."),
+        help_text=_("Nombre que llevan los documentos; vacío los firma Itzaka."),
     )
     color = models.CharField(
         max_length=7,
