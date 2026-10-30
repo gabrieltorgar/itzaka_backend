@@ -3,7 +3,7 @@
 annotated-types==0.8.0
     # via pydantic
 anthropic==1.15.0
-    # via presuplano-backend
+    # via itzaka-backend
 anyio==4.15.1
     # via
     #   anthropic
@@ -15,7 +15,7 @@ asgiref==3.12.1
 boto3==1.43.114
     # via
     #   django-storages
-    #   presuplano-backend
+    #   itzaka-backend
 botocore==1.43.116
     # via
     #   boto3
@@ -30,31 +30,31 @@ django==6.1.2
     #   django-unfold
     #   djangorestframework
     #   djangorestframework-simplejwt
-    #   presuplano-backend
+    #   itzaka-backend
 django-cors-headers==4.9.0
-    # via presuplano-backend
+    # via itzaka-backend
 django-csp==4.0
-    # via presuplano-backend
+    # via itzaka-backend
 django-environ==0.14.0
-    # via presuplano-backend
+    # via itzaka-backend
 django-filter==26.2
-    # via presuplano-backend
+    # via itzaka-backend
 django-phonenumber-field==8.5.0
-    # via presuplano-backend
+    # via itzaka-backend
 django-storages==1.14.6
-    # via presuplano-backend
+    # via itzaka-backend
 django-unfold==0.110.0
-    # via presuplano-backend
+    # via itzaka-backend
 djangorestframework==3.18.3
     # via
     #   djangorestframework-simplejwt
-    #   presuplano-backend
+    #   itzaka-backend
 djangorestframework-simplejwt==5.5.1
-    # via presuplano-backend
+    # via itzaka-backend
 docstring-parser==0.18.0
     # via anthropic
 filetype==1.2.0
-    # via presuplano-backend
+    # via itzaka-backend
 h11==0.16.0 ; sys_platform != 'emscripten'
     # via httpcore2
 httpcore2==2.14.0 ; sys_platform != 'emscripten'
@@ -75,10 +75,10 @@ jmespath==1.1.0
     #   botocore
 numpy==2.5.4
     # via
+    #   itzaka-backend
     #   opencv-python-headless
-    #   presuplano-backend
 opencv-python-headless==5.0.0.93
-    # via presuplano-backend
+    # via itzaka-backend
 opentelemetry-api==1.45.1
     # via anthropic
 packaging==26.3
@@ -86,9 +86,9 @@ packaging==26.3
 phonenumbers==9.0.41
     # via django-phonenumber-field
 pillow==13.0.0
-    # via presuplano-backend
+    # via itzaka-backend
 psycopg==3.3.6
-    # via presuplano-backend
+    # via itzaka-backend
 psycopg-binary==3.3.6 ; implementation_name != 'pypy'
     # via psycopg
 pydantic==2.14.1
@@ -130,4 +130,4 @@ tzdata==2026.5 ; sys_platform == 'win32'
 urllib3==2.8.0
     # via botocore
 whitenoise==6.12.0
-    # via presuplano-backend
+    # via itzaka-backend
