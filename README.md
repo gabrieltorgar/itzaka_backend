@@ -31,7 +31,7 @@ con su comprobante, hasta el cierre del proyecto con documento resumen.
 
 <!-- readme:auto:version -->
 
-**Versión:** 3.8.0 — `pyproject.toml` · historial en [CHANGELOG.md](CHANGELOG.md)
+**Versión:** 3.10.0 — `pyproject.toml` · historial en [CHANGELOG.md](CHANGELOG.md)
 
 <!-- /readme:auto:version -->
 
