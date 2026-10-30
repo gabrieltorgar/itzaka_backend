@@ -6,7 +6,7 @@ Menos de 200 líneas, concreta y verificable; lo de un stack va en .claude/rules
 Es contexto, no un control: las garantías duras viven en CI (quality-gate, security, README sincronizado, gate_guard).
 Los bloques marcados para repos de código o para el repo de documentación los resuelve agent_files.py por tipo de repo.
 -->
-# Guía de desarrollo para agentes — CUOTREKA (backend)
+# Guía de desarrollo para agentes — Itzaka (backend)
 
 Reglas universales de comportamiento e ingeniería para cualquier persona o agente que toque este repositorio, independientes del stack. Las reglas del stack (estructura, nombres, patrones, comandos) y el flujo de contribución viven en `.claude/rules/`; en lo que es propio de su stack, esas mandan.
 
@@ -29,7 +29,7 @@ Si dos instrucciones se contradicen, no elijas en silencio: nombra el conflicto 
 No asumas. No escondas la confusión. Expón las alternativas.
 
 - Lee esta guía, `.claude/rules/`, el README y el código relacionado; sigue sus convenciones salvo que haya una razón justificada para proponer otra.
-- Ubica el US o item que pide el cambio (`US-03`, `iteracion-N #K`) y sus criterios: escenarios Gherkin y criterios de seguridad (`SEC-02`, `VAL-01`…) del backlog en la memoria `cuotreka_docs`. Sin US ni item no hay cambio (reglas de contribución).
+- Ubica el US o item que pide el cambio (`US-03`, `iteracion-N #K`) y sus criterios: escenarios Gherkin y criterios de seguridad (`SEC-02`, `VAL-01`…) del backlog en la memoria `itzaka_docs`. Sin US ni item no hay cambio (reglas de contribución).
 - Antes de modificar una solución existente, identifica qué problema resuelve y por qué está así (pruebas, historial, decisiones registradas). No la reemplaces por preferencia personal.
 - No asumas que un archivo, función, dependencia, comando o variable existe: compruébalo.
 - Identifica la fuente de verdad de cada dato o configuración; no crees otra que pueda divergir.

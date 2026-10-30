@@ -27,7 +27,7 @@ class TestTokenRefresh:
         response = api_client.post(REFRESH_URL)
 
         assert response.status_code == status.HTTP_200_OK
-        assert response.cookies["cuotreka_access"].value
+        assert response.cookies["itzaka_access"].value
         assert "access" not in response.data
 
     def test_a_refresh_sent_in_the_body_still_works(
@@ -38,12 +38,12 @@ class TestTokenRefresh:
         login = api_client.post(
             LOGIN_URL, {"email": account.email, "password": "testpass123"}
         )
-        refresh = login.cookies["cuotreka_refresh"].value
+        refresh = login.cookies["itzaka_refresh"].value
 
         response = APIClient().post(REFRESH_URL, {"refresh": refresh})
 
         assert response.status_code == status.HTTP_200_OK
-        assert response.cookies["cuotreka_access"].value
+        assert response.cookies["itzaka_access"].value
 
     def test_invalid_refresh_returns_401(self, api_client) -> None:
         """A bogus refresh token is rejected with 401."""

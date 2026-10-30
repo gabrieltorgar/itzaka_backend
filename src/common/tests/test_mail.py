@@ -33,7 +33,7 @@ class FakeResponse:
 @pytest.fixture
 def configurado(settings):
     settings.RESEND_API_KEY = "re_test"
-    settings.RESEND_FROM = "CUOTREKA <hola@cuotreka.mx>"
+    settings.RESEND_FROM = "Itzaka <hola@itzaka.mx>"
 
 
 class TestResend:
@@ -62,25 +62,25 @@ class TestResend:
         antes: lo que manda es la marca, y de la variable sólo se toma la
         dirección del dominio verificado.
         """
-        settings.RESEND_FROM = "presuplano <hola@cuotreka.mx>"
+        settings.RESEND_FROM = "presuplano <hola@itzaka.mx>"
         urlopen = mocker.patch("urllib.request.urlopen", return_value=FakeResponse(200))
 
         mail.send_email(to="ana@estudio.mx", subject="Hola", html="<p>Hola</p>")
 
         body = json.loads(urlopen.call_args.args[0].data)
-        assert body["from"] == "CUOTREKA <hola@cuotreka.mx>"
+        assert body["from"] == "Itzaka <hola@itzaka.mx>"
 
     def test_a_bare_address_gets_the_brand_too(
         self, settings, configurado, mocker
     ) -> None:
         """US-127 - Con la pura dirección, también firma la marca."""
-        settings.RESEND_FROM = "hola@cuotreka.mx"
+        settings.RESEND_FROM = "hola@itzaka.mx"
         urlopen = mocker.patch("urllib.request.urlopen", return_value=FakeResponse(200))
 
         mail.send_email(to="ana@estudio.mx", subject="Hola", html="<p>Hola</p>")
 
         body = json.loads(urlopen.call_args.args[0].data)
-        assert body["from"] == "CUOTREKA <hola@cuotreka.mx>"
+        assert body["from"] == "Itzaka <hola@itzaka.mx>"
 
     def test_the_client_says_who_it_is(self, configurado, mocker) -> None:
         """Caso de borde - Sin nombre, Cloudflare corta la petición.
@@ -119,7 +119,7 @@ class TestResend:
         entender por qué la cotización nunca llegó.
         """
         settings.RESEND_API_KEY = "re_test"
-        settings.RESEND_FROM = "CUOTREKA <onboarding@resend.dev>"
+        settings.RESEND_FROM = "Itzaka <onboarding@resend.dev>"
         mocker.patch("urllib.request.urlopen", return_value=FakeResponse(200))
 
         with caplog.at_level(logging.WARNING, logger="apps"):
@@ -202,7 +202,7 @@ class TestProduccionSinCorreo:
     def test_without_the_key_production_does_not_deploy(self, settings) -> None:
         settings.REQUIRE_EMAIL_DELIVERY = True
         settings.RESEND_API_KEY = ""
-        settings.RESEND_FROM = "CUOTREKA <hola@cuotreka.mx>"
+        settings.RESEND_FROM = "Itzaka <hola@itzaka.mx>"
 
         errores = checks.email_delivery(None)
 
@@ -212,7 +212,7 @@ class TestProduccionSinCorreo:
     def test_with_the_test_sender_production_does_not_deploy(self, settings) -> None:
         settings.REQUIRE_EMAIL_DELIVERY = True
         settings.RESEND_API_KEY = "re_test"
-        settings.RESEND_FROM = "CUOTREKA <onboarding@resend.dev>"
+        settings.RESEND_FROM = "Itzaka <onboarding@resend.dev>"
 
         errores = checks.email_delivery(None)
 
@@ -295,7 +295,7 @@ class TestTanda:
         assert request.full_url == mail.RESEND_BATCH_ENDPOINT
         cuerpo = json.loads(request.data)
         assert [item["to"] for item in cuerpo] == [[f"p{n}@obra.mx"] for n in range(20)]
-        assert {item["from"] for item in cuerpo} == {"CUOTREKA <hola@cuotreka.mx>"}
+        assert {item["from"] for item in cuerpo} == {"Itzaka <hola@itzaka.mx>"}
         assert cuerpo[3]["subject"] == "Hola 3"
 
     def test_a_refused_batch_sends_nothing(self, configurado, mocker) -> None:

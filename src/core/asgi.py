@@ -1,4 +1,4 @@
-"""ASGI config for CUOTREKA backend."""
+"""ASGI config for Itzaka backend."""
 
 import os
 import sys

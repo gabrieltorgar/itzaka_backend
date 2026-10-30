@@ -1,4 +1,4 @@
-"""WSGI config for CUOTREKA backend."""
+"""WSGI config for Itzaka backend."""
 
 import os
 import sys

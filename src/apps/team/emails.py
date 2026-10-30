@@ -20,7 +20,7 @@ def _invitation(*, brand: Brand, empresa: str, email: str, token: str, days: int
         brand=brand,
         title="Te invitaron a colaborar",
         intro=(
-            f"{empresa} te invita a trabajar con su equipo en CUOTREKA: "
+            f"{empresa} te invita a trabajar con su equipo en Itzaka: "
             "cotizaciones, proyectos, cobros y planos de la empresa."
         ),
         url=invitation_url(token),
@@ -30,7 +30,7 @@ def _invitation(*, brand: Brand, empresa: str, email: str, token: str, days: int
             "puedes ignorarlo: sin el enlace no pasa nada."
         ),
     )
-    return mail.Message(to=email, subject=f"{empresa} te invita a CUOTREKA", html=html)
+    return mail.Message(to=email, subject=f"{empresa} te invita a Itzaka", html=html)
 
 
 def send_invitation_email(*, account: User, email: str, token: str, days: int) -> bool:
