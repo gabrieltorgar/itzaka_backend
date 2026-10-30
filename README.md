@@ -119,6 +119,9 @@ Archivo: `src/core/.env.example` → cópialo a `src/core/.env`. Aquí solo van 
 | `CSRF_COOKIE_DOMAIN` | Empty: host-only cookie (the SPA calls /api on its own domain). |
 | `CSRF_COOKIE_NAME` | Per environment when two share a domain; the SPA repeats it (VITE_CSRF_COOKIE_NAME). |
 | `DATABASE_URL` | — |
+| `CONN_MAX_AGE` | Neon: DATABASE_URL is the pooled host (-pooler, transaction mode); keep 0 there. |
+| `DATABASE_URL_UNPOOLED` | Direct (unpooled) host, for migrate and createcachetable (never the pooler). |
+| `DATABASE_URL_MIGRATIONS` | Direct host with the owner role (multi-company); preferred for migrations. |
 | `LOG_DIR` | — |
 | `OTP_UNIVERSAL_CODE` | — |
 | `OTP_UNIVERSAL_CODE_ENABLED` | Only opens accounts while mail is not configured, and only where enabled: on by default with DEBUG, off in production unless set on purpose. |
@@ -314,12 +317,16 @@ Verificación de los formularios públicos en el servidor (`common/recaptcha.py`
 
 ### Base de datos — Neon
 
-PostgreSQL de Neon por entorno, en `DATABASE_URL`.
+PostgreSQL de Neon por entorno. La API usa `DATABASE_URL`, el host con pooler
+(PgBouncer en modo transacción): conexiones de una petición
+(`CONN_MAX_AGE`, 0 por omisión), revisadas antes de reusarse y sin cursores del
+servidor (`core/settings.py`).
 
 ## Administración
 
 - Panel en `/admin/` del dominio de la API (Django Unfold); cada modelo de
-  `apps/` tiene su registro.
+  `apps/` tiene su registro, y las sesiones emitidas y anuladas (lista negra
+  de simplejwt) se consultan ahí, de solo lectura las emitidas.
 - Acceso: sólo el equipo de Itzaka, con un superusuario creado con
   `createsuperuser`; las cuentas de los clientes y sus colaboradores no entran
   al admin. Las credenciales nunca viven en el repositorio ni en este README.

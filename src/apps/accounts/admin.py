@@ -5,12 +5,19 @@ from django.contrib.auth.admin import GroupAdmin as BaseGroupAdmin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import Group
 from django.utils.translation import gettext_lazy as _
+from rest_framework_simplejwt.token_blacklist import admin as blacklist_admin
+from rest_framework_simplejwt.token_blacklist.models import (
+    BlacklistedToken,
+    OutstandingToken,
+)
 from unfold.admin import ModelAdmin
 from unfold.forms import AdminPasswordChangeForm, UserChangeForm, UserCreationForm
 
 from apps.accounts.models import Organization, OtpCode, Subscription, User
 
-admin.site.unregister(Group)
+# Llegan con el ModelAdmin de Django: se vuelven a registrar con Unfold.
+for _model in (Group, OutstandingToken, BlacklistedToken):
+    admin.site.unregister(_model)
 
 
 @admin.register(Group)
@@ -92,3 +99,13 @@ class OtpCodeAdmin(ModelAdmin):
         "used_at",
         "attempts",
     )
+
+
+@admin.register(OutstandingToken)
+class OutstandingTokenAdmin(blacklist_admin.OutstandingTokenAdmin, ModelAdmin):
+    """Las sesiones emitidas (refresh), de solo lectura como en simplejwt."""
+
+
+@admin.register(BlacklistedToken)
+class BlacklistedTokenAdmin(blacklist_admin.BlacklistedTokenAdmin, ModelAdmin):
+    """Las sesiones anuladas: al renovar, al salir o al cambiar la contraseña."""

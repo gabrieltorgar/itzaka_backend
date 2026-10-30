@@ -11,11 +11,8 @@ from common.auth_cookies import access_from
 
 def _enforce_csrf(request: Request) -> None:
     """Una escritura con la cookie lleva el token CSRF, como la sesión de Django."""
-
-    def _no_response(_request):  # pragma: no cover - CSRFCheck sólo lo guarda
-        return None
-
-    check = CSRFCheck(_no_response)
+    # CSRFCheck es un middleware: guarda la vista siguiente y nunca la llama aquí.
+    check = CSRFCheck(lambda _request: None)
     check.process_request(request)
     reason = check.process_view(request, None, (), {})
     if reason:
