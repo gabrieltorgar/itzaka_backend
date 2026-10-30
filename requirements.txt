@@ -8,15 +8,15 @@ anyio==4.15.1
     # via
     #   anthropic
     #   httpx2
-asgiref==3.12.1
+asgiref==3.13.0
     # via
     #   django
     #   django-cors-headers
-boto3==1.43.114
+boto3==1.43.119
     # via
     #   django-storages
     #   itzaka-backend
-botocore==1.43.116
+botocore==1.43.119
     # via
     #   boto3
     #   s3transfer
@@ -57,9 +57,9 @@ filetype==1.2.0
     # via itzaka-backend
 h11==0.16.0 ; sys_platform != 'emscripten'
     # via httpcore2
-httpcore2==2.14.0 ; sys_platform != 'emscripten'
+httpcore2==2.16.0 ; sys_platform != 'emscripten'
     # via httpx2
-httpx2==2.14.0
+httpx2==2.16.0
     # via anthropic
 httpx2-jsfetch==1.0 ; sys_platform == 'emscripten'
     # via httpx2
@@ -67,7 +67,7 @@ idna==3.20
     # via
     #   anyio
     #   httpx2
-jiter==0.17.0
+jiter==0.18.0
     # via anthropic
 jmespath==1.1.0
     # via
@@ -83,7 +83,7 @@ opentelemetry-api==1.45.1
     # via anthropic
 packaging==26.3
     # via django-csp
-phonenumbers==9.0.41
+phonenumbers==9.0.42
     # via django-phonenumber-field
 pillow==13.0.0
     # via itzaka-backend
@@ -99,7 +99,7 @@ pyjwt==2.15.1
     # via djangorestframework-simplejwt
 python-dateutil==2.9.0.post0
     # via botocore
-s3transfer==0.19.2
+s3transfer==0.19.3
     # via boto3
 six==1.17.0
     # via python-dateutil
