@@ -3,6 +3,11 @@
 Todas las notas de cambios relevantes de la API. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es-ES/) y versionado semántico.
 
+## [Unreleased] — En curso
+
+### Fixed
+- **seguridad — TEC La API entrega la cookie CSRF a la SPA, con la cookie y los orígenes desde el entorno**: Nuevo `GET /api/auth/csrf/` (204, público y sin autenticación): deja la cookie CSRF antes del primer POST de un navegador nuevo; antes respondía 404 y el token llegaba solo con el login o con /me/. `CSRF_COOKIE_NAME` (por omisión `csrftoken`) y `CSRF_COOKIE_DOMAIN` (por omisión ninguno: la SPA llama a /api por su propio dominio) se leen del entorno; `CSRF_TRUSTED_ORIGINS` y `CORS_ALLOWED_ORIGINS` también, con orígenes exactos. `Retry-After` queda expuesto por CORS para que la SPA muestre la espera de un 429. `src/core/.env.example` lista las cuatro variables. (SEC-04.3, SEC-04, SEC-04.6 · iteracion-24 #1)
+
 ## [3.11.0] — 2026-10-30 · iteracion-21: dominio propio itzaka.grupotorresmucino.com
 
 ### Changed

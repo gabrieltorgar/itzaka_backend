@@ -114,7 +114,10 @@ Archivo: `src/core/.env.example` → cópialo a `src/core/.env`. Aquí solo van 
 | `DEBUG` | — |
 | `SECRET_KEY` | — |
 | `ALLOWED_HOSTS` | — |
-| `CORS_ALLOWED_ORIGINS` | — |
+| `CORS_ALLOWED_ORIGINS` | Exact origins, comma separated, never wildcards (also trusted for CSRF). |
+| `CSRF_TRUSTED_ORIGINS` | Extra exact origins trusted for CSRF, besides the CORS ones. |
+| `CSRF_COOKIE_DOMAIN` | Empty: host-only cookie (the SPA calls /api on its own domain). |
+| `CSRF_COOKIE_NAME` | Per environment when two share a domain; the SPA repeats it (VITE_CSRF_COOKIE_NAME). |
 | `DATABASE_URL` | — |
 | `LOG_DIR` | — |
 | `OTP_UNIVERSAL_CODE` | — |
@@ -240,8 +243,9 @@ responden `{requested, processed, failed}` (`common/bulk.py`).
 
 - Web: sesión con JWT en cookies `HttpOnly` que emite la API
   (`POST /api/auth/login/`; `POST /api/auth/refresh/` rota el refresh y el
-  anterior queda en la lista negra; `POST /api/auth/logout/`). Django pone la
-  cookie `csrftoken` y cada escritura lleva la cabecera `X-CSRFToken`. El
+  anterior queda en la lista negra; `POST /api/auth/logout/`). La SPA pide
+  `GET /api/auth/csrf/` al arrancar: deja la cookie CSRF (`CSRF_COOKIE_NAME`,
+  `csrftoken` por omisión) y cada escritura lleva la cabecera `X-CSRFToken`. El
   navegador nunca lee ni envía tokens: no hay `Authorization: Bearer` para la
   web, y la aplicación llama a la API por su propio dominio (`/api/*`).
 - Registro con correo y contraseña; la cuenta se confirma con un código de 6

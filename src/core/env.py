@@ -52,6 +52,13 @@ SESSION_COOKIE_SAMESITE = "Lax"
 # HttpOnly no añade protección y deja sin poder escribir a la aplicación.
 CSRF_COOKIE_HTTPONLY = False
 CSRF_COOKIE_SAMESITE = "Lax"
+# La SPA llama a /api por su propio dominio (vercel.json reenvía al backend), así
+# que la cookie queda en ese host: sin Domain. Solo si la SPA llamara a la API
+# en otro subdominio se pondría el dominio padre (".dominio.com"). El nombre
+# cambia por entorno cuando dos comparten dominio; la SPA lo repite en
+# VITE_CSRF_COOKIE_NAME.
+CSRF_COOKIE_DOMAIN = env("CSRF_COOKIE_DOMAIN", default=None) or None
+CSRF_COOKIE_NAME = env("CSRF_COOKIE_NAME", default="csrftoken")
 
 # --- Cabeceras (siempre) ---
 # Explícito aunque sea el valor de Django: ninguna dirección de la API sale
