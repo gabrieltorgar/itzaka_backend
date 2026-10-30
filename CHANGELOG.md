@@ -3,11 +3,13 @@
 Todas las notas de cambios relevantes de la API. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es-ES/) y versionado semántico.
 
-## [Unreleased] — En curso
+## [3.13.0] — 2026-10-30 · iteracion-24: cumplimiento de seguridad: la cookie CSRF para la SPA y cuerpos de auth sin tokens
 
 ### Fixed
 - **seguridad — TEC La API entrega la cookie CSRF a la SPA, con la cookie y los orígenes desde el entorno**: Nuevo `GET /api/auth/csrf/` (204, público y sin autenticación): deja la cookie CSRF antes del primer POST de un navegador nuevo; antes respondía 404 y el token llegaba solo con el login o con /me/. `CSRF_COOKIE_NAME` (por omisión `csrftoken`) y `CSRF_COOKIE_DOMAIN` (por omisión ninguno: la SPA llama a /api por su propio dominio) se leen del entorno; `CSRF_TRUSTED_ORIGINS` y `CORS_ALLOWED_ORIGINS` también, con orígenes exactos. `Retry-After` queda expuesto por CORS para que la SPA muestre la espera de un 429. `src/core/.env.example` lista las cuatro variables. (SEC-04.3, SEC-04, SEC-04.6 · iteracion-24 #1)
 - **seguridad — TEC Prueba base: las respuestas de auth web nunca llevan tokens**: `test_web_auth_responses_carry_no_tokens` revisa todas las respuestas que abren o renuevan la sesión web: entrar, renovar, cambiar la contraseña y aceptar una invitación. Exige que la sesión llegue solo en las cookies HttpOnly y que el cuerpo no traiga `access` ni `refresh` en ningún nivel, ni el valor de alguna de las cookies. El comportamiento ya era ese; la prueba lo deja protegido. (CRD-02.1 · iteracion-24 #2)
+
+---
 
 ## [3.11.0] — 2026-10-30 · iteracion-21: dominio propio itzaka.grupotorresmucino.com
 
