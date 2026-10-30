@@ -276,7 +276,7 @@ RECAPTCHA_SECRET_KEY = env.str("RECAPTCHA_SECRET_KEY", default="").strip()
 RECAPTCHA_ENABLED = env.bool("RECAPTCHA_ENABLED", default=bool(RECAPTCHA_SECRET_KEY))
 RECAPTCHA_MIN_SCORE = env.float("RECAPTCHA_MIN_SCORE", default=0.5)
 RECAPTCHA_HOSTNAMES = env.list(
-    "RECAPTCHA_HOSTNAMES", default=["cuotreka.vercel.app", "localhost"]
+    "RECAPTCHA_HOSTNAMES", default=["itzaka.grupotorresmucino.com", "localhost"]
 )
 
 # Tope de lo que puede viajar adjunto en un correo. Un PDF de cotización pesa
@@ -296,7 +296,7 @@ REQUIRE_EMAIL_DELIVERY = env.bool(
     default=env.str("VERCEL_ENV", default="") == "production",
 )
 # A dónde llevan los enlaces de los correos: la aplicación, no la API.
-APP_BASE_URL = env.str("APP_BASE_URL", default="https://cuotreka.vercel.app")
+APP_BASE_URL = env.str("APP_BASE_URL", default="https://itzaka.grupotorresmucino.com")
 
 # Tope del documento de un plano. Una textura suelta y el plano de fondo
 # escaneado viajan dentro del JSON, que es lo que puede engordarlo.

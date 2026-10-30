@@ -7,6 +7,10 @@ cierran (503) y el contacto se acepta marcado para revisar.
 """
 
 import json
+import os
+import subprocess
+import sys
+from pathlib import Path
 from urllib.error import URLError
 
 import pytest
@@ -112,6 +116,28 @@ class TestEncendidoConLaLlave:
         assert core_settings.RECAPTCHA_ENABLED is bool(
             core_settings.RECAPTCHA_SECRET_KEY
         )
+
+
+class TestDominioDeLaMarca:
+    """Sin RECAPTCHA_HOSTNAMES configurada, se acepta el dominio de Itzaka."""
+
+    def test_the_default_hostnames_are_the_brand_domain(self) -> None:
+        entorno = {k: v for k, v in os.environ.items() if k != "RECAPTCHA_HOSTNAMES"}
+        entorno["DJANGO_SETTINGS_MODULE"] = "core.settings"
+        salida = subprocess.run(  # noqa: S603 -- el mismo intérprete, sin shell
+            [
+                sys.executable,
+                "-c",
+                "from django.conf import settings as s; print(*s.RECAPTCHA_HOSTNAMES)",
+            ],
+            cwd=Path(core_settings.__file__).resolve().parents[1],
+            env=entorno,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        assert salida.stdout.split() == ["itzaka.grupotorresmucino.com", "localhost"]
 
 
 REGISTRO = {

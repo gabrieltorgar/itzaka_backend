@@ -3,6 +3,11 @@
 Todas las notas de cambios relevantes de la API. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es-ES/) y versionado semántico.
 
+## [Unreleased] — En curso
+
+### Changed
+- **plataforma — TEC Dominio propio: itzaka.grupotorresmucino.com**: La API de producción pasa a `https://api-itzaka.grupotorresmucino.com` y la aplicación a `https://itzaka.grupotorresmucino.com`, que la llama por su propio dominio (`/api`). Cambian los valores por omisión de `APP_BASE_URL` (los enlaces de los correos) y `RECAPTCHA_HOSTNAMES` (`itzaka.grupotorresmucino.com,localhost`), `src/core/.env.example` y el `User-Agent` con el que el backend se presenta a Resend.
+
 ## [3.10.0] — 2026-10-30 · iteracion-20: marca Itzaka (paleta de piedra y logo de talud-tablero)
 
 ### Added
