@@ -3,6 +3,7 @@
 from django.urls import path
 
 from apps.accounts.views import (
+    CsrfCookieView,
     LoginView,
     LogoutView,
     MyAccountDeleteView,
@@ -24,6 +25,7 @@ from apps.accounts.views import (
 app_name = "accounts"
 
 urlpatterns = [
+    path("csrf/", CsrfCookieView.as_view(), name="csrf"),
     path("register/", RegisterView.as_view(), name="register"),
     path("verify-otp/", VerifyOtpView.as_view(), name="verify-otp"),
     path("resend-otp/", ResendOtpView.as_view(), name="resend-otp"),

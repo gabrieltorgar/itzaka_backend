@@ -24,8 +24,6 @@ env = environ.Env(
     DEBUG=(bool, True),
     SECRET_KEY=(str, "dev-insecure-change-me"),
     ALLOWED_HOSTS=(list, ["*"]),
-    CSRF_TRUSTED_ORIGINS=(list, []),
-    CORS_ALLOWED_ORIGINS=(list, ["http://localhost:5173"]),
     DATABASE_URL=(str, f"sqlite:///{BASE_DIR / 'db.sqlite3'}"),
     LOG_DIR=(str, str(BASE_DIR / "tmp" / "logs")),
     OTP_UNIVERSAL_CODE=(str, "123456"),
@@ -52,7 +50,8 @@ ON_VERCEL = env.bool("VERCEL", default=False)
 DEBUG = env.bool("DEBUG", default=not ON_VERCEL)
 SECRET_KEY = env("SECRET_KEY")
 ALLOWED_HOSTS = env("ALLOWED_HOSTS")
-CSRF_TRUSTED_ORIGINS = env("CSRF_TRUSTED_ORIGINS")
+# Orígenes exactos (https://app.dominio.com), nunca comodines.
+CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])
 
 # On Vercel, trust the deployment's own hostnames so ALLOWED_HOSTS, CSRF and the
 # admin login keep working on preview/production URLs without per-deploy config.
@@ -320,10 +319,14 @@ OTP_TTL_MINUTES = env("OTP_TTL_MINUTES")
 
 # --- CORS ---
 CORS_ALLOW_ALL_ORIGINS = False
-CORS_ALLOWED_ORIGINS = env("CORS_ALLOWED_ORIGINS")
+CORS_ALLOWED_ORIGINS = env.list(
+    "CORS_ALLOWED_ORIGINS", default=["http://localhost:5173"]
+)
 CORS_ALLOW_CREDENTIALS = True
 # La empresa en la que se trabaja viaja en su propia cabecera (iteracion-14).
 CORS_ALLOW_HEADERS = (*default_headers, "x-empresa")
+# Tras un 429 la SPA muestra cuánto esperar: sin esto no puede leer la cabecera.
+CORS_EXPOSE_HEADERS = ["Retry-After"]
 # La SPA escribe con la cookie de la sesión y su token CSRF: el origen de la
 # aplicación tiene que ser de confianza para la comprobación CSRF de Django.
 CSRF_TRUSTED_ORIGINS = list(dict.fromkeys(CSRF_TRUSTED_ORIGINS + CORS_ALLOWED_ORIGINS))
