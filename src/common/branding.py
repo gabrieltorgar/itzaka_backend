@@ -41,6 +41,9 @@ class Brand:
     #: El fondo del encabezado (vacío: el color de la marca) y el nombre encima.
     band: str = ""
     ink: str = LETTERHEAD_INK
+    #: Si el nombre se escribe como el de Itzaka junto al símbolo: «ITZAKA»,
+    #: Inter 800 a +0.08 em, con la firma del grupo debajo (manual v2.0).
+    wordmark: bool = False
 
 
 def house_brand() -> Brand:
@@ -52,6 +55,7 @@ def house_brand() -> Brand:
         optimized=False,
         band=HOUSE_BAND,
         ink=HOUSE_INK,
+        wordmark=True,
     )
 
 

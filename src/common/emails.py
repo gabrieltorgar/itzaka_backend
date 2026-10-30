@@ -24,6 +24,21 @@ def _row(label: str, value: str) -> str:
     )
 
 
+def _header_name(brand: Brand) -> str:
+    """El nombre del encabezado: el del despacho tal cual, o «ITZAKA» con su firma."""
+    if not brand.wordmark:
+        return (
+            f'<div style="color:{escape(brand.ink)};font-size:18px;font-weight:700">'
+            f"{escape(brand.name)}</div>"
+        )
+    return (
+        f'<div style="color:{escape(brand.ink)};font-size:18px;'
+        f'font-weight:800;letter-spacing:0.08em">{escape(brand.name.upper())}</div>'
+        f'<div style="color:#5E5A55;font-size:12px;margin-top:2px">'
+        f"{escape(GROUP_SIGNATURE)}</div>"
+    )
+
+
 def render_email(
     *,
     brand: Brand,
@@ -65,8 +80,7 @@ def render_email(
         'border-bottom:1px solid #E4E0DA">'
         f'<table role="presentation" cellpadding="0" cellspacing="0"><tr>'
         f'<td style="padding-right:12px">{logo}</td>'
-        f'<td style="color:{escape(brand.ink)};font-size:18px;font-weight:700">'
-        f"{escape(brand.name)}</td></tr></table></td></tr>"
+        f"<td>{_header_name(brand)}</td></tr></table></td></tr>"
         '<tr><td style="padding:24px">'
         f'<h1 style="margin:0 0 8px;color:#141517;font-size:20px">{escape(title)}</h1>'
         f'<p style="margin:0;color:#3A3733;font-size:15px;line-height:24px">'

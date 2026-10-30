@@ -9,7 +9,7 @@ import pytest
 
 from apps.accounts.models import DEFAULT_ORGANIZATION_COLOR, Organization
 from common.brand import GROUP_SIGNATURE
-from common.branding import BRAND_LOGO_PATH, house_brand
+from common.branding import BRAND_LOGO_PATH, brand_for, house_brand
 from common.emails import render_email
 from core.settings_unfold import UNFOLD
 
@@ -37,6 +37,26 @@ class TestElCorreoDeLaCasa:
         assert "background:#FFFFFF;padding:20px 24px" in html
         assert f"color:{OBSIDIANA};font-size:18px" in html
         assert GROUP_SIGNATURE in html
+
+    def test_the_house_email_writes_the_wordmark_next_to_the_symbol(self) -> None:
+        """US-127 - Junto al símbolo, «ITZAKA» (Inter 800, +0.08 em) y la firma."""
+        html = render_email(brand=house_brand(), title="Hola", intro="Texto")
+
+        assert 'alt="Itzaka"' in html
+        assert 'font-weight:800;letter-spacing:0.08em">ITZAKA</div>' in html
+        assert f">{GROUP_SIGNATURE}</div>" in html
+
+    @pytest.mark.django_db
+    def test_a_letterhead_email_keeps_the_organization_name(self, user_factory) -> None:
+        """US-127 - Con membrete, el encabezado dice el nombre del despacho tal cual."""
+        user = user_factory()
+        Organization.objects.create(user=user, name="Taller Reyes")
+        user.refresh_from_db()
+
+        html = render_email(brand=brand_for(user=user), title="Hola", intro="Texto")
+
+        assert ">Taller Reyes</div>" in html
+        assert "ITZAKA" not in html
 
     def test_the_email_uses_the_stone_neutrals(self) -> None:
         """US-127 - Grises de piedra y pie legible (AA), sin grises azulados."""
