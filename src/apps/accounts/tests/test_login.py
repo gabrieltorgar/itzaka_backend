@@ -26,8 +26,8 @@ class TestLogin:
 
         assert response.status_code == status.HTTP_200_OK
         # La sesión va en cookies HttpOnly, nunca en el cuerpo (iteracion-12).
-        assert response.cookies["cuotreka_access"].value
-        assert response.cookies["cuotreka_refresh"].value
+        assert response.cookies["itzaka_access"].value
+        assert response.cookies["itzaka_refresh"].value
         assert "access" not in response.data
         assert response.data["user"]["email"] == account.email
 

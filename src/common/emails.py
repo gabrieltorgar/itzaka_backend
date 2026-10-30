@@ -7,19 +7,35 @@ estilos y ninguno entiende flexbox.
 
 from html import escape
 
+from common.brand import BRAND_NAME, GROUP_SIGNATURE
 from common.branding import OPTIMIZED_BY, Brand
 
 #: El pie que llevan todos: qué es esto y de dónde salió.
-SIGNATURE = "Este mensaje se generó desde CUOTREKA."
+SIGNATURE = f"Este mensaje se generó desde {BRAND_NAME}, {GROUP_SIGNATURE}."
 
 
 def _row(label: str, value: str) -> str:
     return (
         "<tr>"
-        f'<td style="padding:6px 0;color:#64748B;font-size:14px">{escape(label)}</td>'
-        f'<td style="padding:6px 0;color:#0F172A;font-size:14px;text-align:right;'
+        f'<td style="padding:6px 0;color:#5E5A55;font-size:14px">{escape(label)}</td>'
+        f'<td style="padding:6px 0;color:#141517;font-size:14px;text-align:right;'
         f'font-weight:600">{escape(value)}</td>'
         "</tr>"
+    )
+
+
+def _header_name(brand: Brand) -> str:
+    """El nombre del encabezado: el del despacho tal cual, o «ITZAKA» con su firma."""
+    if not brand.wordmark:
+        return (
+            f'<div style="color:{escape(brand.ink)};font-size:18px;font-weight:700">'
+            f"{escape(brand.name)}</div>"
+        )
+    return (
+        f'<div style="color:{escape(brand.ink)};font-size:18px;'
+        f'font-weight:800;letter-spacing:0.08em">{escape(brand.name.upper())}</div>'
+        f'<div style="color:#5E5A55;font-size:12px;margin-top:2px">'
+        f"{escape(GROUP_SIGNATURE)}</div>"
     )
 
 
@@ -45,32 +61,33 @@ def render_email(
         else ""
     )
     aviso = (
-        f'<p style="margin:16px 0 0;color:#475569;font-size:14px;line-height:22px">'
+        f'<p style="margin:16px 0 0;color:#5E5A55;font-size:14px;line-height:22px">'
         f"{escape(note)}</p>"
         if note
         else ""
     )
     pie = f"{OPTIMIZED_BY} · {SIGNATURE}" if brand.optimized else SIGNATURE
+    band = brand.band or brand.color
 
     return (
         '<!doctype html><html lang="es"><body style="margin:0;padding:0;'
-        'background:#F1F5F9;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif">'
+        'background:#F5F3F0;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif">'
         '<table role="presentation" width="100%" cellpadding="0" cellspacing="0">'
         '<tr><td align="center" style="padding:24px 12px">'
         '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" '
         'style="max-width:560px;background:#FFFFFF;border-radius:12px;overflow:hidden">'
-        f'<tr><td style="background:{escape(brand.color)};padding:20px 24px">'
+        f'<tr><td style="background:{escape(band)};padding:20px 24px;'
+        'border-bottom:1px solid #E4E0DA">'
         f'<table role="presentation" cellpadding="0" cellspacing="0"><tr>'
         f'<td style="padding-right:12px">{logo}</td>'
-        f'<td style="color:#FFFFFF;font-size:18px;font-weight:700">'
-        f"{escape(brand.name)}</td></tr></table></td></tr>"
+        f"<td>{_header_name(brand)}</td></tr></table></td></tr>"
         '<tr><td style="padding:24px">'
-        f'<h1 style="margin:0 0 8px;color:#0F172A;font-size:20px">{escape(title)}</h1>'
-        f'<p style="margin:0;color:#334155;font-size:15px;line-height:24px">'
+        f'<h1 style="margin:0 0 8px;color:#141517;font-size:20px">{escape(title)}</h1>'
+        f'<p style="margin:0;color:#3A3733;font-size:15px;line-height:24px">'
         f"{escape(intro)}</p>"
         f"{detalle}{aviso}</td></tr>"
-        f'<tr><td style="padding:16px 24px;border-top:1px solid #E2E8F0;'
-        f'color:#94A3B8;font-size:12px">{escape(pie)}</td></tr>'
+        f'<tr><td style="padding:16px 24px;border-top:1px solid #E4E0DA;'
+        f'color:#5E5A55;font-size:12px">{escape(pie)}</td></tr>'
         "</table></td></tr></table></body></html>"
     )
 
@@ -81,7 +98,7 @@ def render_code_email(
     """El correo de un código: el número, grande y solo, es lo que se copia."""
     caja = (
         f'<div style="margin:20px 0;padding:16px;border-radius:10px;'
-        f"background:#F8FAFC;border:1px solid #E2E8F0;text-align:center;"
+        f"background:#FAF9F7;border:1px solid #E4E0DA;text-align:center;"
         f'font-size:32px;letter-spacing:8px;font-weight:700;color:{escape(brand.color)}">'
         f"{escape(code)}</div>"
     )
@@ -102,7 +119,7 @@ def render_link_email(
         f'style="display:inline-block;padding:12px 20px;border-radius:10px;'
         f"background:{escape(brand.color)};color:#FFFFFF;font-weight:700;"
         f'text-decoration:none;font-size:15px">{escape(label)}</a></p>'
-        f'<p style="margin:0;color:#64748B;font-size:12px;word-break:break-all">'
+        f'<p style="margin:0;color:#5E5A55;font-size:12px;word-break:break-all">'
         f"{escape(url)}</p>"
     )
     cuerpo = render_email(brand=brand, title=title, intro=intro, note=note)

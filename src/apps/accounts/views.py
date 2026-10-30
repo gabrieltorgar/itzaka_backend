@@ -55,8 +55,8 @@ from apps.legal.services import client_ip
 from apps.team.permissions import IsCompanyAdmin
 from apps.team.tenancy import account_of, is_company_admin
 from common.auth_cookies import (
-    REFRESH_COOKIE,
     clear_session_cookies,
+    refresh_from,
     set_session_cookies,
     set_token_cookies,
 )
@@ -177,7 +177,7 @@ class SessionRefreshView(APIView):
     authentication_classes: list = []
 
     def post(self, request: Request) -> Response:
-        raw = request.COOKIES.get(REFRESH_COOKIE) or request.data.get("refresh")
+        raw = refresh_from(request) or request.data.get("refresh")
         serializer = TokenRefreshSerializer(data={"refresh": raw or ""})
         try:
             serializer.is_valid(raise_exception=True)
@@ -209,7 +209,7 @@ class LogoutView(APIView):
     authentication_classes: list = []
 
     def post(self, request: Request) -> Response:
-        raw = request.COOKIES.get(REFRESH_COOKIE)
+        raw = refresh_from(request)
         if raw:
             try:
                 RefreshToken(raw).blacklist()

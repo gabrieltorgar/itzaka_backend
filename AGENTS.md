@@ -3,7 +3,7 @@ Plantilla de git-deploy-ops (assets/agents/AGENTS.md): puntero en la raíz para 
 Cursor, Copilot, Gemini y otros). Claude Code no lo lee cuando existe CLAUDE.md o .claude/CLAUDE.md, así que nada se
 carga dos veces. No copies reglas aquí: cambia la fuente.
 -->
-# Instrucciones para agentes — CUOTREKA (backend)
+# Instrucciones para agentes — Itzaka (backend)
 
 Las reglas de este repositorio viven en un solo lugar. Léelas antes de cambiar algo y síguelas:
 

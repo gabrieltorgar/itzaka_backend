@@ -6,7 +6,7 @@ from rest_framework.request import Request
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 
-from common.auth_cookies import ACCESS_COOKIE
+from common.auth_cookies import access_from
 
 
 def _enforce_csrf(request: Request) -> None:
@@ -34,7 +34,7 @@ class CookieJWTAuthentication(JWTAuthentication):
         if self.get_header(request) is not None:
             return super().authenticate(request)
 
-        raw = request.COOKIES.get(ACCESS_COOKIE)
+        raw = access_from(request)
         if not raw:
             return None
         try:

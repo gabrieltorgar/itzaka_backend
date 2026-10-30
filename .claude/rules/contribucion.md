@@ -4,7 +4,7 @@ Sin frontmatter paths: Claude Code la carga siempre. Es la fuente única de las 
 (raíz, para GitHub) solo apunta aquí. Los bloques de código o de docs los resuelve agent_files.py por tipo de repo.
 Resume references/git-conventions.md y versioning-release.md de git-deploy-ops: si cambian, actualiza esta plantilla.
 -->
-# Reglas de contribución — CUOTREKA (backend)
+# Reglas de contribución — Itzaka (backend)
 
 Cómo entra un cambio a este repositorio, para personas y agentes. Es la única fuente: `CONTRIBUTING.md` apunta aquí.
 

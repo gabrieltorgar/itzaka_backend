@@ -54,7 +54,7 @@ class TestEnvioDeDocumentos:
     def test_without_a_letterhead_the_house_brand_signs(
         self, authenticated_client, correo
     ) -> None:
-        """Flujo principal - Sin organización configurada firma CUOTREKA."""
+        """Flujo principal - Sin organización configurada firma Itzaka."""
         enviar(authenticated_client)
 
         html = correo.call_args.kwargs["html"]
@@ -64,7 +64,7 @@ class TestEnvioDeDocumentos:
     def test_with_a_letterhead_it_carries_its_colors_and_a_footer(
         self, authenticated_client, user, correo
     ) -> None:
-        """Flujo principal - Con membrete, su color y el pie de CUOTREKA."""
+        """Flujo principal - Con membrete, su color y el pie de Itzaka."""
         organizacion = get_my_organization(user=user)
         organizacion.name = "Estudio Reyes"
         organizacion.color = "#0F766E"

@@ -1,10 +1,11 @@
-"""Django settings for CUOTREKA backend.
+"""Django settings for Itzaka backend.
 
 Modular settings: this file holds Django's own config and initializes
 ``environ`` once. STATIC/MEDIA/security live in ``core.env``; each third-party
 library with significant config gets its own ``settings_<name>.py``.
 """
 
+import tomllib
 from datetime import timedelta
 from pathlib import Path
 
@@ -13,6 +14,11 @@ from corsheaders.defaults import default_headers
 
 # BASE_DIR = repo root (parents: settings.py -> core -> src -> repo)
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# The release number lives only in pyproject.toml ([project].version): git-deploy-ops
+# set_version.py bumps it in the «Versión X.Y.Z» commit. Never a literal (DOC-VER02).
+with (BASE_DIR.parent / "pyproject.toml").open("rb") as pyproject:
+    APP_VERSION: str = tomllib.load(pyproject)["project"]["version"]
 
 env = environ.Env(
     DEBUG=(bool, True),
@@ -123,7 +129,7 @@ ROOT_URLCONF = "core.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        "DIRS": [BASE_DIR / "templates"],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -233,7 +239,7 @@ BULK_COSTLY_MAX_ITEMS = env.int("BULK_COSTLY_MAX_ITEMS", default=50)
 CACHES = {
     "default": {
         "BACKEND": "django.core.cache.backends.db.DatabaseCache",
-        "LOCATION": "cuotreka_cache",
+        "LOCATION": "itzaka_cache",
     }
 }
 
@@ -281,7 +287,7 @@ DOCUMENT_EMAIL_MAX_BYTES = env.int("DOCUMENT_EMAIL_MAX_BYTES", default=8 * 1024 
 # Se recortan: un salto de línea o un espacio pegado al pegar el valor
 # invalida la llave —Resend contesta 401— sin que se vea en ningún lado.
 RESEND_API_KEY = env.str("RESEND_API_KEY", default="").strip()
-RESEND_FROM = env.str("RESEND_FROM", default="CUOTREKA <onboarding@resend.dev>").strip()
+RESEND_FROM = env.str("RESEND_FROM", default="Itzaka <onboarding@resend.dev>").strip()
 # Producción no sale sin correo (iteracion-16): sin la llave, o con el remitente
 # de prueba de Resend, `migrate` —parte del build— se detiene (common/checks.py)
 # y un correo que no puede salir queda como error, no como aviso.

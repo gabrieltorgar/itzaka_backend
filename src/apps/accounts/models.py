@@ -19,14 +19,14 @@ from phonenumber_field.modelfields import PhoneNumberField
 from apps.accounts.managers import UserManager
 from common.uploads import organization_logo_upload_to
 
-#: CUOTREKA's own blue: what a document is painted with until the account
-#: chooses its own color.
-DEFAULT_ORGANIZATION_COLOR = "#1E56D6"
+#: Itzaka's obsidian: what a new account's documents are painted with until it
+#: chooses its own color. Accounts created before keep the color they stored.
+DEFAULT_ORGANIZATION_COLOR = "#141517"
 
 #: A color has to be usable as ink on paper, so only full six-digit hex passes.
 HEX_COLOR_VALIDATOR = RegexValidator(
     regex=r"^#[0-9A-Fa-f]{6}$",
-    message="El color debe ser hexadecimal, por ejemplo #1E56D6.",
+    message="El color debe ser hexadecimal, por ejemplo #141517.",
 )
 
 
@@ -133,7 +133,7 @@ class Organization(models.Model):
 
     Accounts are one-person workspaces, so this is not a tenancy boundary —
     it is the letterhead. It stays optional: with no name the documents are
-    signed by CUOTREKA itself, which is how every account started.
+    signed by Itzaka itself, which is how every account started.
     """
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -148,7 +148,7 @@ class Organization(models.Model):
         blank=True,
         default="",
         verbose_name=_("nombre"),
-        help_text=_("Nombre que llevan los documentos; vacío los firma CUOTREKA."),
+        help_text=_("Nombre que llevan los documentos; vacío los firma Itzaka."),
     )
     color = models.CharField(
         max_length=7,

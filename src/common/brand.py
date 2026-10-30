@@ -6,5 +6,7 @@ saber cómo se llama el producto. El dominio, el nombre del paquete y el del
 bucket no son la marca: se quedan como están.
 """
 
-BRAND_NAME = "CUOTREKA"
+BRAND_NAME = "Itzaka"
+#: La firma del grupo: va donde la marca aparece en un pie, el acceso o un correo.
+GROUP_SIGNATURE = "una solución de Grupo Torres Muciño"
 BRAND_SLOGAN = "Del plano a la obra, todo conectado."

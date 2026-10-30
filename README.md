@@ -1,8 +1,8 @@
-# CUOTREKA — Backend
+# Itzaka — Backend
 
 > Del plano a la obra, todo conectado.
 
-API del cotizador para arquitectos **CUOTREKA**. Permite registrar tarifas
+API del cotizador para arquitectos **Itzaka** (una solución de Grupo Torres Muciño). Permite registrar tarifas
 (precio por m², metro lineal, piso/muro, etc.), clientes, cotizaciones,
 avances de proyecto con evidencia fotográfica, y pagos (totales o parciales)
 con su comprobante, hasta el cierre del proyecto con documento resumen.
@@ -31,7 +31,7 @@ con su comprobante, hasta el cierre del proyecto con documento resumen.
 
 <!-- readme:auto:version -->
 
-**Versión:** 3.8.0 — `pyproject.toml` · historial en [CHANGELOG.md](CHANGELOG.md)
+**Versión:** 3.10.0 — `pyproject.toml` · historial en [CHANGELOG.md](CHANGELOG.md)
 
 <!-- /readme:auto:version -->
 
@@ -189,6 +189,7 @@ Cobertura mínima: **90 %** (`MIN_COVERAGE` del workflow). Una prueba en rojo, u
 | `src/apps/` | Apps de dominio (tabla abajo) |
 | `src/common/` | Código compartido: modelos abstractos, permisos, paginación, filtros, acciones masivas, errores |
 | `src/core/` | Settings, URLs, WSGI/ASGI y middleware |
+| `src/templates/` | Plantillas |
 | `src/tests/` | Pruebas de plataforma (línea base) |
 | `scripts/` | Scripts vendorizados (quality gate, README) y de build |
 | `.github/workflows/` | CI |
@@ -315,7 +316,7 @@ PostgreSQL de Neon por entorno, en `DATABASE_URL`.
 
 - Panel en `/admin/` del dominio de la API (Django Unfold); cada modelo de
   `apps/` tiene su registro.
-- Acceso: sólo el equipo de CUOTREKA, con un superusuario creado con
+- Acceso: sólo el equipo de Itzaka, con un superusuario creado con
   `createsuperuser`; las cuentas de los clientes y sus colaboradores no entran
   al admin. Las credenciales nunca viven en el repositorio ni en este README.
 
@@ -374,7 +375,7 @@ Este repositorio sigue el flujo de entrega del equipo. Reglas completas en [.cla
 El código se construye por *user story* siguiendo el flujo de entrega del
 equipo (Producto → Desarrollo TDD → Testing → Deploy). El backlog formal, la
 fuente única de alcance, vive en la memoria del proyecto, el repositorio
-[`cuotreka_docs`](https://github.com/gabrieltorgar/cuotreka_docs)
+[`itzaka_docs`](https://github.com/gabrieltorgar/itzaka_docs)
 (`producto/4.0_Backlog_Producto.json`; sitio en https://cuotreka-docs.vercel.app), junto con la guía de despliegue que antes
 era `DEPLOY.md` (`legado/backend/DEPLOY.md`). Variables de entorno: ver
 `src/core/.env.example`.

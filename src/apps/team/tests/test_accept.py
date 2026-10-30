@@ -112,7 +112,7 @@ class TestCrearLaCuenta:
             aceptar("enlace-ana"), {"password": PASSWORD, **accepted()}, format="json"
         )
 
-        assert "cuotreka_access" in response.cookies
+        assert "itzaka_access" in response.cookies
         assert response.data["user"]["email"] == "ana@estudio.mx"
 
     def test_it_says_which_company_to_enter(self, api_client, invitacion) -> None:
@@ -184,7 +184,7 @@ class TestYaTengoCuenta:
         assert Membership.objects.filter(
             user=cuenta, account=invitacion.account
         ).exists()
-        assert "cuotreka_access" in response.cookies
+        assert "itzaka_access" in response.cookies
 
     def test_a_wrong_password_adds_nothing(self, api_client, invitacion) -> None:
         cuenta = UserFactory(email="ana@estudio.mx", password=PASSWORD)
@@ -196,7 +196,7 @@ class TestYaTengoCuenta:
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert response.data["password"] == ["La contraseña no es correcta."]
         assert not Membership.objects.filter(user=cuenta).exists()
-        assert "cuotreka_access" not in response.cookies
+        assert "itzaka_access" not in response.cookies
 
     def test_an_unconfirmed_account_is_confirmed_by_the_link(
         self, api_client, invitacion
@@ -282,7 +282,7 @@ class TestFormularioPublico:
 
         assert response.status_code == status.HTTP_201_CREATED
         assert not User.objects.filter(email="ana@estudio.mx").exists()
-        assert "cuotreka_access" not in response.cookies
+        assert "itzaka_access" not in response.cookies
 
     def test_a_filled_trap_answers_with_the_shape_of_a_success(
         self, api_client, invitacion
@@ -303,7 +303,7 @@ class TestFormularioPublico:
         assert response.data["company"]["id"]
         assert response.data["company"]["name"] == "Estudio Reyes"
         assert response.data["user"]["email"] == "ana@estudio.mx"
-        assert "cuotreka_access" not in response.cookies
+        assert "itzaka_access" not in response.cookies
         invitacion.refresh_from_db()
         assert invitacion.status == Invitation.Status.PENDING
         assert not Membership.objects.exists()

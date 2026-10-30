@@ -257,4 +257,4 @@ class TestCampoTrampa:
         )
 
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
-        assert "cuotreka_access" not in response.cookies
+        assert "itzaka_access" not in response.cookies

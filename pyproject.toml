@@ -1,7 +1,7 @@
 [project]
-name = "presuplano-backend"
-version = "3.8.0"
-description = "CUOTREKA — cotizador multi-tenant para arquitectos (backend API)"
+name = "itzaka-backend"
+version = "3.10.0"
+description = "Itzaka — cotizador multi-tenant para arquitectos (backend API)"
 requires-python = ">=3.12"
 dependencies = [
     "django>=5.2,<6.2",
