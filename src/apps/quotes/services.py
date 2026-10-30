@@ -8,6 +8,8 @@ from rest_framework.exceptions import ValidationError
 
 from apps.catalog.models import Tariff
 from apps.clients.models import Client
+from apps.folios.codes import DocumentType
+from apps.folios.services import assign_folio
 from apps.planner.models import Plan
 from apps.quotes.models import DEFAULT_VALIDITY_DAYS, Quote, QuoteItem
 
@@ -69,6 +71,8 @@ def create_quote(
     _ensure_owned(owner=owner, client=client, items_data=items_data, plan=plan)
     quote = Quote.objects.create(
         owner=owner,
+        # El folio sale de la configuración de la empresa (iteracion-25).
+        folio=assign_folio(owner=owner, document_type=DocumentType.QUOTE),
         client=client,
         plan=plan,
         notes=(notes or "").strip(),

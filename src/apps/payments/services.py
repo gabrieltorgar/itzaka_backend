@@ -6,6 +6,8 @@ from decimal import Decimal
 from django.db import transaction
 from rest_framework.exceptions import ValidationError
 
+from apps.folios.codes import DocumentType
+from apps.folios.services import assign_folio
 from apps.payments.models import Payment
 from apps.projects.models import Project
 from apps.projects.selectors import advanced_value, quoted_value
@@ -60,14 +62,18 @@ def register_payment(
     if amount <= 0:
         raise ValidationError("El monto del pago debe ser mayor a 0")
 
-    payment = Payment.objects.create(
-        owner=owner,
-        project=project,
-        amount=amount,
-        date=date,
-        quote_item=quote_item,
-        method=method,
-    )
+    # El folio y el pago, en la misma transacción: si el pago no se guarda, el
+    # número vuelve al contador (iteracion-25).
+    with transaction.atomic():
+        payment = Payment.objects.create(
+            owner=owner,
+            folio=assign_folio(owner=owner, document_type=DocumentType.PAYMENT),
+            project=project,
+            amount=amount,
+            date=date,
+            quote_item=quote_item,
+            method=method,
+        )
     logger.info("Payment registered", extra={"payment_id": str(payment.pk)})
     return payment
 

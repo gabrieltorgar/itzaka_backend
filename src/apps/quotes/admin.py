@@ -3,6 +3,8 @@
 from django.contrib import admin
 from unfold.admin import ModelAdmin, TabularInline
 
+from apps.folios.admin import FolioAssignedAdminMixin
+from apps.folios.codes import DocumentType
 from apps.quotes.models import Quote, QuoteItem
 
 
@@ -12,9 +14,12 @@ class QuoteItemInline(TabularInline):
 
 
 @admin.register(Quote)
-class QuoteAdmin(ModelAdmin):
-    list_display = ("id", "client", "status", "plan", "owner", "created_at")
+class QuoteAdmin(FolioAssignedAdminMixin, ModelAdmin):
+    folio_document_type = DocumentType.QUOTE
+    list_display = ("folio", "client", "status", "plan", "owner", "created_at")
     list_filter = ("status",)
+    search_fields = ("folio", "client__name")
+    readonly_fields = ("folio",)
     inlines = [QuoteItemInline]
 
 

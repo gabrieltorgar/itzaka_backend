@@ -1,9 +1,12 @@
 """Payments model: a payment against a project, optionally tied to an element."""
 
+from functools import partial
+
 from django.conf import settings
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
+from apps.folios.codes import FOLIO_MAX_LENGTH, random_folio
 from common.models import TimestampedModel
 
 
@@ -44,12 +47,26 @@ class Payment(TimestampedModel):
         verbose_name=_("método de pago"),
     )
     date = models.DateField(verbose_name=_("fecha"))
+    # El folio que imprime el documento (iteracion-25, US-142): lo asigna
+    # apps.folios.services.assign_folio al crearlo y no cambia nunca. El
+    # default es el «Autogenerado», por si algo lo crea fuera del servicio.
+    folio = models.CharField(
+        max_length=FOLIO_MAX_LENGTH,
+        default=partial(random_folio, "REC"),
+        editable=False,
+        verbose_name=_("folio"),
+    )
 
     class Meta:
         db_table = "payments_payment"
         ordering = ["date", "created_at"]
         verbose_name = _("pago")
         verbose_name_plural = _("pagos")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["owner", "folio"], name="payments_payment_folio_per_owner"
+            )
+        ]
 
     def __str__(self) -> str:
         return f"Pago {self.amount}"

@@ -3,6 +3,8 @@
 from django.contrib import admin
 from unfold.admin import ModelAdmin, TabularInline
 
+from apps.folios.admin import FolioAssignedAdminMixin
+from apps.folios.codes import DocumentType
 from apps.staff.models import Assignment, Worker, WorkerPayment, WorkerService
 
 
@@ -26,10 +28,12 @@ class AssignmentAdmin(ModelAdmin):
 
 
 @admin.register(WorkerPayment)
-class WorkerPaymentAdmin(ModelAdmin):
-    list_display = ("worker", "amount", "method", "date", "project", "owner")
+class WorkerPaymentAdmin(FolioAssignedAdminMixin, ModelAdmin):
+    folio_document_type = DocumentType.WORKER_PAYMENT
+    list_display = ("folio", "worker", "amount", "method", "date", "project", "owner")
     list_filter = ("method",)
-    search_fields = ("worker__name",)
+    search_fields = ("folio", "worker__name")
+    readonly_fields = ("folio",)
 
 
 @admin.register(WorkerService)

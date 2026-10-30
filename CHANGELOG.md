@@ -3,6 +3,14 @@
 Todas las notas de cambios relevantes de la API. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es-ES/) y versionado semántico.
 
+## [Unreleased] — En curso
+
+### Added
+- **folios — US-142 Folios de documentos configurables por organización**: Nueva app `apps.folios`: el folio de cada documento lo asigna el servidor al crearlo (`assign_folio`, dentro de la transacción del documento) y queda guardado. Por empresa y tipo de documento (cotización, estado del proyecto, comprobante de pago y de pago a personal) hay dos modalidades: «Autogenerado» (`COT-` y 8 caracteres aleatorios, la forma de siempre; se vuelve a sortear si repite) y «Con clave» (de 1 a 5 letras o números en mayúsculas, validada en el servidor, y un consecutivo: `VEN-101`). El contador es por empresa y clave (`FolioCounter`, bloqueado con `select_for_update`), nunca se reinicia y lo comparten los tipos que usan la misma clave; `IssuedFolio` registra cada folio emitido con una restricción única por empresa, también entre tipos. Endpoints `GET /api/folio-settings/` (un objeto por tipo con su modalidad, su clave y el siguiente folio), `GET/PUT /api/folio-settings/<tipo>/` (cambiarlo es del administrador, US-140) y `GET /api/folio-settings/<tipo>/preview/?mode=&prefix=` (el siguiente folio de una clave sin guardarla). Admin de Unfold de solo lectura para contadores y folios emitidos. (iteracion-25 #2)
+
+### Changed
+- **quotes · projects · payments · staff — US-142 Cada documento guarda su folio**: `Quote`, `Project`, `Payment` y `WorkerPayment` tienen `folio` (no editable, único por empresa con `UniqueConstraint(owner, folio)`), que viaja en sus respuestas y no cambia por edición. Las migraciones `quotes 0007_quote_folio`, `projects 0005_project_folio`, `payments 0003_payment_folio` y `staff 0003_workerpayment_folio` guardan en los documentos que ya existían el folio que sus PDFs imprimían (la clave y los primeros 8 caracteres del id, como lo derivaba el navegador) y lo apartan en el registro de la empresa: lo emitido no cambia. Las cotizaciones se buscan también por folio (`?search=`), y un documento creado desde el admin toma su folio como en la API. (iteracion-25 #2)
+
 ## [3.13.0] — 2026-10-30 · iteracion-24: cumplimiento de seguridad: la cookie CSRF para la SPA y cuerpos de auth sin tokens
 
 ### Fixed

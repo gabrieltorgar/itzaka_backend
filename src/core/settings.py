@@ -104,6 +104,7 @@ INSTALLED_APPS = [
     "apps.documents",
     "apps.legal",
     "apps.team",
+    "apps.folios",
 ]
 
 MIDDLEWARE = [
