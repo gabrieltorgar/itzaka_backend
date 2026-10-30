@@ -303,7 +303,7 @@ class TestEnlaceDeLaMarca:
             check=True,
         )
 
-        assert salida.stdout.strip() == "https://cuotreka.vercel.app"
+        assert salida.stdout.strip() == "https://itzaka.grupotorresmucino.com"
 
 
 @pytest.mark.django_db

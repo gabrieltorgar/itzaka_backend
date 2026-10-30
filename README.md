@@ -31,7 +31,7 @@ con su comprobante, hasta el cierre del proyecto con documento resumen.
 
 <!-- readme:auto:version -->
 
-**Versión:** 3.10.0 — `pyproject.toml` · historial en [CHANGELOG.md](CHANGELOG.md)
+**Versión:** 3.11.0 — `pyproject.toml` · historial en [CHANGELOG.md](CHANGELOG.md)
 
 <!-- /readme:auto:version -->
 
@@ -335,8 +335,8 @@ Vercel (`vercel.json`):
 
 <!-- /readme:auto:despliegue -->
 
-- Producción: https://api-presuplano.vercel.app (admin en `/admin/`); la
-  aplicación la llama por su propio dominio, https://cuotreka.vercel.app/api/.
+- Producción: https://api-itzaka.grupotorresmucino.com (admin en `/admin/`); la
+  aplicación la llama por su propio dominio, https://itzaka.grupotorresmucino.com/api/.
 - Las variables por entorno (sólo nombres) viven en `tecnico/infraestructura.md`
   de la memoria del proyecto, que es privada.
 - Verificación después de desplegar: `/api/health/` responde 200 y
