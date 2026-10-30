@@ -215,7 +215,7 @@ REST_FRAMEWORK = {
     },
     # Detrás del proxy de Vercel, la dirección real es la del X-Forwarded-For.
     "NUM_PROXIES": env.int("NUM_PROXIES", default=1),
-    "EXCEPTION_HANDLER": "common.exceptions.exception_handler",
+    "EXCEPTION_HANDLER": "common.exceptions.api_exception_handler",
     # JSON y nada más en producción: la API navegable es una página más que
     # cuidar (y que pone estilos en línea, que la CSP no deja pasar).
     "DEFAULT_RENDERER_CLASSES": (

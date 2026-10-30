@@ -3,6 +3,11 @@
 Todas las notas de cambios relevantes de la API. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es-ES/) y versionado semántico.
 
+## [Unreleased] — En curso
+
+### Fixed
+- **common/exceptions.py — TEC La API responde 409 o 400 con su motivo en vez de un 500**: El manejador de errores pasa a `common.exceptions.api_exception_handler` (registrado en `REST_FRAMEWORK["EXCEPTION_HANDLER"]`). El `ValidationError` de Django es un 400 con el dict de campos (un mensaje suelto va a `non_field_errors`): un id que no es UUID en `GET /api/payments/summary/`, `/api/payments/voucher/` (`?project=`) o `/api/worker-payments/summary/` (`?worker=`) respondía 500. Borrar algo en uso (`ProtectedError`/`RestrictedError`, p. ej. `DELETE /api/workers/{id}/` de alguien con repartos, pagos o avances) es un 409 que dice qué lo usa («No se puede eliminar porque tiene registros relacionados: pagos a personal.»); antes recibía el mensaje de dos peticiones simultáneas, que pedía reintentar. El resto de `IntegrityError` sigue en 409 con su mensaje y `code: conflict`, y el 429 conserva su texto. (ERR-B01 · iteracion-25 #3)
+
 ## [3.13.0] — 2026-10-30 · iteracion-24: cumplimiento de seguridad: la cookie CSRF para la SPA y cuerpos de auth sin tokens
 
 ### Fixed
