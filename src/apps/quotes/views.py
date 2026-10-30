@@ -64,7 +64,7 @@ class QuoteViewSet(viewsets.ModelViewSet):
             validity_days=data.get("validity_days"),
             plan=data.get("plan"),
         )
-        return Response(QuoteSerializer(quote).data, status=status.HTTP_201_CREATED)
+        return Response(self._read(quote), status=status.HTTP_201_CREATED)
 
     def update(self, request: Request, *args, **kwargs) -> Response:
         quote = self.get_object()
@@ -76,7 +76,7 @@ class QuoteViewSet(viewsets.ModelViewSet):
             notes=data.get("notes"),
             validity_days=data.get("validity_days"),
         )
-        return Response(QuoteSerializer(quote).data)
+        return Response(self._read(quote))
 
     def partial_update(self, request: Request, *args, **kwargs) -> Response:
         return self.update(request, *args, **kwargs)
@@ -92,8 +92,14 @@ class QuoteViewSet(viewsets.ModelViewSet):
             plan=serializer.validated_data["plan"],
             items_data=serializer.validated_data["items"],
         )
-        # Releída: la que se trajo para actualizarla guarda sus partidas de antes.
-        return Response(QuoteSerializer(self.get_queryset().get(pk=quote.pk)).data)
+        return Response(self._read(quote))
+
+    def _read(self, quote) -> dict:
+        """The quote as it is now, its lines and rooms in one read (no N+1).
+
+        Read again: the one fetched to change it holds its lines from before.
+        """
+        return QuoteSerializer(self.get_queryset().get(pk=quote.pk)).data
 
     def perform_destroy(self, instance) -> None:
         delete_quote(quote=instance)

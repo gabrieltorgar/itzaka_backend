@@ -22,6 +22,13 @@ MAX_VALIDITY_DAYS = 365
 #: Lo que caben las observaciones: un par de párrafos, no un contrato.
 NOTES_MAX_LENGTH = 2000
 
+#: Lo que cabe el nombre de una habitación: el mismo largo que el de un plano.
+ROOM_NAME_MAX_LENGTH = 150
+
+#: Entre cuántas habitaciones se reparte una partida, como mucho: más de las
+#: que tiene una casa grande, y un tope para que nadie mande miles.
+MAX_ROOMS_PER_ITEM = 100
+
 
 class Quote(TimestampedModel):
     """A quote for a client, composed of line items with an automatic total."""
@@ -145,3 +152,41 @@ class QuoteItem(TimestampedModel):
 
     def __str__(self) -> str:
         return f"{self.name} × {self.quantity}"
+
+
+class QuoteItemRoom(TimestampedModel):
+    """How much of a line falls in one room of its plan (iteracion-25).
+
+    The plan measures a service across every element it hangs from, and the
+    line keeps the sum; this keeps the share of each room so the document can
+    break the quote down by room. What no room claims —a line added by hand, a
+    wall that bounds none— is the line's quantity minus its rooms, which is why
+    the rooms of a line never add up to more than the line.
+    """
+
+    quote_item = models.ForeignKey(
+        QuoteItem,
+        on_delete=models.CASCADE,
+        related_name="rooms",
+        verbose_name=_("servicio cotizado"),
+    )
+    name = models.CharField(
+        max_length=ROOM_NAME_MAX_LENGTH, verbose_name=_("habitación")
+    )
+    quantity = models.DecimalField(
+        max_digits=12, decimal_places=2, verbose_name=_("cantidad")
+    )
+
+    class Meta:
+        db_table = "quotes_quote_item_room"
+        ordering = ["name"]
+        verbose_name = _("cantidad por habitación")
+        verbose_name_plural = _("cantidades por habitación")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["quote_item", "name"], name="quotes_item_room_once"
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.name}: {self.quantity}"

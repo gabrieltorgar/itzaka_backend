@@ -3,6 +3,11 @@
 Todas las notas de cambios relevantes de la API. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es-ES/) y versionado semántico.
 
+## [Unreleased] — En curso
+
+### Added
+- **cotizaciones — US-12 PDF de cotización con desglose por habitación**: Cada partida que mide el plano guarda cuánto de ella cae en cada habitación: las partidas traen `rooms` = `[{name, quantity}]` (modelo nuevo `QuoteItemRoom`, con su admin; migración `quotes 0007_desglose_por_habitacion`, sólo crea la tabla). Crear y editar (`/api/quotes/`) y `POST /api/quotes/{id}/plan-sync/` lo aceptan opcional en cada partida: hasta 100 habitaciones, nombre de hasta 150 caracteres, cada una una sola vez y sin pasar de la cantidad de la partida (lo que sobra no cae en ninguna habitación). Recotizar el plano reemplaza el reparto de sus partidas. Editar la cotización a mano sin `rooms` conserva el reparto de una partida del plano mientras su cantidad lo alcance; si la cantidad baja, la partida se queda sin habitación. El resumen global no cambia: la partida, su cantidad, su subtotal y el total son los mismos; la lista, el detalle y las escrituras traen las habitaciones con sus partidas sin una consulta por cada una. (US-12, US-95 · iteracion-25 #1)
+
 ## [3.13.0] — 2026-10-30 · iteracion-24: cumplimiento de seguridad: la cookie CSRF para la SPA y cuerpos de auth sin tokens
 
 ### Fixed
