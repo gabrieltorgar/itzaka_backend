@@ -41,8 +41,13 @@ entrypoint = "wsgi:application"
 
 [tool.ruff]
 line-length = 88
-# scripts/test_gate.py es la herramienta del quality gate, copiada tal cual del flujo.
-extend-exclude = ["scripts/test_gate.py"]
+# Los scripts del gate (git-deploy-ops) se copian tal cual del flujo: ni lint ni formato.
+extend-exclude = [
+    "scripts/test_gate.py",
+    "scripts/security_audit.py",
+    "scripts/gate_guard.py",
+    "scripts/readme_sync.py",
+]
 target-version = "py312"
 src = ["src"]
 

@@ -144,6 +144,17 @@ TEMPLATES = [
 WSGI_APPLICATION = "core.wsgi.application"
 
 DATABASES = {"default": env.db("DATABASE_URL")}
+# El pooler de Neon corre PgBouncer en modo transacción: los cursores del
+# servidor (.iterator()) se rompen entre transacciones, y tras el reposo de Neon
+# una conexión guardada puede estar muerta. Conexiones cortas y revisadas antes
+# de reusarse.
+DATABASES["default"].update(
+    {
+        "CONN_MAX_AGE": env.int("CONN_MAX_AGE", default=0),
+        "CONN_HEALTH_CHECKS": True,
+        "DISABLE_SERVER_SIDE_CURSORS": True,
+    }
+)
 
 AUTH_USER_MODEL = "accounts.User"
 # La única pantalla con sesión de Django es el admin, y el login de Unfold no
@@ -215,7 +226,7 @@ REST_FRAMEWORK = {
     },
     # Detrás del proxy de Vercel, la dirección real es la del X-Forwarded-For.
     "NUM_PROXIES": env.int("NUM_PROXIES", default=1),
-    "EXCEPTION_HANDLER": "common.exceptions.exception_handler",
+    "EXCEPTION_HANDLER": "common.exceptions.api_exception_handler",
     # JSON y nada más en producción: la API navegable es una página más que
     # cuidar (y que pone estilos en línea, que la CSP no deja pasar).
     "DEFAULT_RENDERER_CLASSES": (

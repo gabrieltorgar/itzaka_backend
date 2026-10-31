@@ -4,10 +4,15 @@ Not tied to a user story. The registry test keeps going RED whenever a model is
 added without its Unfold admin.
 """
 
+import json
+from pathlib import Path
+
 import pytest
 from django.apps import apps
 from django.contrib import admin
 from unfold.admin import ModelAdmin as UnfoldModelAdmin
+
+REPO = Path(__file__).resolve().parents[3]
 
 # Models deliberately kept out of the admin. Every entry needs a justification.
 EXCLUDED_FROM_ADMIN: set[str] = set()
@@ -64,3 +69,28 @@ def test_local_model_is_registered_with_unfold_model_admin(model):
     assert isinstance(model_admin, UnfoldModelAdmin), (
         f"{model._meta.label} uses {type(model_admin).__name__}, not Unfold's"
     )
+
+
+def test_vercel_json_follows_the_deploy_standard():
+    """GIT-02: solo main y develop, build sin dev y migraciones por la URL directa.
+
+    La de la función (DATABASE_URL) es el pooler de Neon en modo transacción:
+    migrate y createcachetable van por DATABASE_URL_MIGRATIONS o, si no está,
+    DATABASE_URL_UNPOOLED, y el build falla si no hay ninguna.
+    """
+    config = json.loads((REPO / "vercel.json").read_text(encoding="utf-8"))
+    build = config["buildCommand"]
+
+    assert config["git"]["deploymentEnabled"] == {
+        "**": False,
+        "main": True,
+        "develop": True,
+    }
+    assert "uv sync --frozen --no-dev" in build
+    assert "collectstatic" not in build
+    direct = 'DATABASE_URL="${DATABASE_URL_MIGRATIONS:-'
+    for command in ("migrate --noinput", "createcachetable"):
+        step = next(part for part in build.split("&&") if command in part)
+        assert step.strip().startswith(direct), f"{command}: por la URL directa"
+    assert "${DATABASE_URL_UNPOOLED:?" in build, "sin URL directa, el build falla"
+    assert config.get("functions"), "functions.<wsgi>.excludeFiles"
