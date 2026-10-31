@@ -11,7 +11,7 @@ from apps.clients.models import Client
 from apps.folios.codes import DocumentType
 from apps.folios.services import assign_folio
 from apps.planner.models import Plan
-from apps.quotes.models import DEFAULT_VALIDITY_DAYS, Quote, QuoteItem
+from apps.quotes.models import DEFAULT_VALIDITY_DAYS, Quote, QuoteItem, QuoteItemRoom
 
 logger = logging.getLogger("apps")
 
@@ -36,13 +36,15 @@ def _create_item(
     quantity: Decimal,
     unit_price: Decimal | None = None,
     from_plan: bool = False,
+    rooms: list[dict] | None = None,
 ) -> QuoteItem:
     """Create a line item snapshotting the service's name, unit and price.
 
     ``unit_price`` overrides the catalogue price for this quote only — the price
-    agreed with this client — and the service keeps its own.
+    agreed with this client — and the service keeps its own. ``rooms`` is how
+    much of it falls in each room of the plan (iteracion-25).
     """
-    return QuoteItem.objects.create(
+    item = QuoteItem.objects.create(
         quote=quote,
         tariff=tariff,
         name=tariff.name,
@@ -51,6 +53,32 @@ def _create_item(
         quantity=quantity,
         from_plan=from_plan,
     )
+    _add_rooms(item=item, rooms=rooms or [])
+    return item
+
+
+def _add_rooms(*, item: QuoteItem, rooms: list[dict]) -> None:
+    """Record how much of ``item`` falls in each room (iteracion-25)."""
+    QuoteItemRoom.objects.bulk_create(
+        QuoteItemRoom(quote_item=item, name=room["name"], quantity=room["quantity"])
+        for room in rooms
+    )
+
+
+def _kept_rooms(previous: QuoteItem | None, quantity: Decimal) -> list[dict]:
+    """The rooms a line edited by hand keeps from what it was (iteracion-25).
+
+    The screen that edits a quote knows nothing of rooms. A line that still
+    covers its old breakdown keeps it —what it gained has no room—, and one
+    that dropped below it loses it: nobody can tell which room gave it up, and
+    inventing a split would put in the document what nobody measured.
+    """
+    if previous is None:
+        return []
+    rooms = [{"name": r.name, "quantity": r.quantity} for r in previous.rooms.all()]
+    if sum((r["quantity"] for r in rooms), Decimal("0")) > quantity:
+        return []
+    return rooms
 
 
 @transaction.atomic
@@ -85,6 +113,7 @@ def create_quote(
             quantity=item["quantity"],
             unit_price=item.get("unit_price"),
             from_plan=bool(item.get("from_plan")),
+            rooms=item.get("rooms"),
         )
     logger.info("Quote created", extra={"quote_id": str(quote.pk)})
     return quote
@@ -125,18 +154,27 @@ def update_quote(
     quote.save(update_fields=fields)
     # La pantalla de la cotización no sabe de planos: lo que no dice si viene
     # del plano conserva lo que era, para que recotizar lo siga reconociendo.
-    measured = set(
-        quote.items.filter(from_plan=True).values_list("tariff_id", flat=True)
-    )
+    # Tampoco sabe de habitaciones: lo mismo con su reparto (iteracion-25).
+    measured_lines = {
+        item.tariff_id: item
+        for item in quote.items.filter(from_plan=True).prefetch_related("rooms")
+    }
+    measured = set(measured_lines)
     quote.items.all().delete()
     for item in items_data:
-        from_plan = item.get("from_plan")
+        sent = item.get("from_plan")
+        from_plan = item["tariff"].id in measured if sent is None else sent
+        rooms = item.get("rooms")
+        if rooms is None and from_plan:
+            previous = measured_lines.pop(item["tariff"].id, None)
+            rooms = _kept_rooms(previous, item["quantity"])
         _create_item(
             quote=quote,
             tariff=item["tariff"],
             quantity=item["quantity"],
             unit_price=item.get("unit_price"),
-            from_plan=item["tariff"].id in measured if from_plan is None else from_plan,
+            from_plan=from_plan,
+            rooms=rooms,
         )
     return quote
 
@@ -148,7 +186,8 @@ def sync_quote_with_plan(*, quote: Quote, plan: Plan, items_data: list[dict]) ->
     The lines that came from the plan take the new quantities and keep their
     price — what was negotiated is still the deal —; a service the plan no
     longer has leaves; a new one enters. What the architect added by hand is
-    not touched.
+    not touched. Each plan line also takes its new breakdown by room
+    (iteracion-25): without one, the plan no longer splits it.
 
     Raises:
         ValidationError: the quote is already a project, which does not change.
@@ -172,10 +211,13 @@ def sync_quote_with_plan(*, quote: Quote, plan: Plan, items_data: list[dict]) ->
                 quantity=data["quantity"],
                 unit_price=data.get("unit_price"),
                 from_plan=True,
+                rooms=data.get("rooms"),
             )
         else:
             line.quantity = data["quantity"]
             line.save(update_fields=["quantity", "updated_at"])
+            line.rooms.all().delete()
+            _add_rooms(item=line, rooms=data.get("rooms") or [])
     quote.items.filter(from_plan=True).exclude(tariff_id__in=measured).delete()
 
     quote.plan = plan

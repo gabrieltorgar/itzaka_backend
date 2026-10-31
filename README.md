@@ -14,7 +14,8 @@ con su comprobante, hasta el cierre del proyecto con documento resumen.
   eliminación de la cuenta.
 - **Catálogo, clientes y cotizaciones:** servicios con su unidad y precio,
   clientes y cotizaciones con total automático, con su documento PDF que se
-  descarga o se envía por correo.
+  descarga o se envía por correo; la que sale de un plano guarda cuánto de cada
+  partida cae en cada habitación, para desglosarla por habitación.
 - **Proyectos, avances y cierre:** una cotización se vuelve proyecto; los avances
   se registran por cantidad con evidencia fotográfica y el cierre entrega su
   documento resumen.
