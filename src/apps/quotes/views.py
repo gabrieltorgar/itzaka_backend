@@ -38,7 +38,7 @@ class QuoteViewSet(viewsets.ModelViewSet):
     serializer_class = QuoteSerializer
     permission_classes = [IsAuthenticated]
     filterset_class = QuoteFilter
-    search_fields = ("client__name",)
+    search_fields = ("client__name", "folio")
     ordering_fields = ("created_at", "total", "client_name")
     ordering_text_fields = ("client_name",)
     ordering = ("-created_at", "-id")

@@ -37,6 +37,7 @@ class PaymentSerializer(serializers.ModelSerializer):
         model = Payment
         fields = [
             "id",
+            "folio",
             "project",
             "quote_item",
             "amount",

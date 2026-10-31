@@ -11,6 +11,7 @@ accrued; the committed is what is still owed by the end if nothing changes.
 """
 
 from decimal import Decimal
+from functools import partial
 
 from django.conf import settings
 from django.db import models
@@ -18,6 +19,7 @@ from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from phonenumber_field.modelfields import PhoneNumberField
 
+from apps.folios.codes import FOLIO_MAX_LENGTH, random_folio
 from common.models import TimestampedModel
 
 
@@ -213,12 +215,26 @@ class WorkerPayment(TimestampedModel):
     note = models.CharField(
         max_length=255, blank=True, default="", verbose_name=_("nota")
     )
+    # El folio que imprime el comprobante (iteracion-25, US-142): lo asigna
+    # apps.folios.services.assign_folio al crearlo y no cambia nunca. El
+    # default es el «Autogenerado», por si algo lo crea fuera del servicio.
+    folio = models.CharField(
+        max_length=FOLIO_MAX_LENGTH,
+        default=partial(random_folio, "PAG"),
+        editable=False,
+        verbose_name=_("folio"),
+    )
 
     class Meta:
         db_table = "staff_workerpayment"
         ordering = ["date", "created_at"]
         verbose_name = _("pago a personal")
         verbose_name_plural = _("pagos a personal")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["owner", "folio"], name="staff_workerpayment_folio_per_owner"
+            )
+        ]
 
     def __str__(self) -> str:
         return f"Pago {self.amount} a {self.worker}"

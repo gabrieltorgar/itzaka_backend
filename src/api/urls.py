@@ -20,4 +20,5 @@ urlpatterns = [
     path("", include("apps.documents.urls")),
     path("", include("apps.legal.urls")),
     path("", include("apps.team.urls")),
+    path("", include("apps.folios.urls")),
 ]

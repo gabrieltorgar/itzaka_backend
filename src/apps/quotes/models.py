@@ -5,12 +5,14 @@ time, so later tariff edits never change an already-issued quote (US-05 edge).
 """
 
 from decimal import ROUND_HALF_UP, Decimal
+from functools import partial
 
 from django.conf import settings
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
+from apps.folios.codes import FOLIO_MAX_LENGTH, random_folio
 from common.models import TimestampedModel
 
 #: Días que valen los precios de una cotización si nadie dice otra cosa.
@@ -79,12 +81,26 @@ class Quote(TimestampedModel):
         verbose_name=_("días de vigencia"),
         help_text=_("Cuántos días valen los precios desde la fecha de emisión."),
     )
+    # El folio que imprime el documento (iteracion-25, US-142): lo asigna
+    # apps.folios.services.assign_folio al crearlo y no cambia nunca. El
+    # default es el «Autogenerado», por si algo lo crea fuera del servicio.
+    folio = models.CharField(
+        max_length=FOLIO_MAX_LENGTH,
+        default=partial(random_folio, "COT"),
+        editable=False,
+        verbose_name=_("folio"),
+    )
 
     class Meta:
         db_table = "quotes_quote"
         ordering = ["-created_at"]
         verbose_name = _("cotización")
         verbose_name_plural = _("cotizaciones")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["owner", "folio"], name="quotes_quote_folio_per_owner"
+            )
+        ]
 
     def __str__(self) -> str:
         return f"Cotización {self.pk} — {self.client}"

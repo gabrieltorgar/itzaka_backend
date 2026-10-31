@@ -144,6 +144,7 @@ class QuoteSerializer(serializers.ModelSerializer):
         model = Quote
         fields = [
             "id",
+            "folio",
             "client",
             "client_name",
             "status",

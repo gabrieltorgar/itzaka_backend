@@ -26,6 +26,12 @@ con su comprobante, hasta el cierre del proyecto con documento resumen.
 - **Inicio:** el resumen de la cuenta: obras en curso, lo cotizado y lo cobrado.
 - **Colaboradores:** el administrador invita por correo; cada persona trabaja en
   las empresas que la invitan y sólo el administrador decide la organización.
+- **Folios de documentos:** cada cotización, estado de proyecto y comprobante
+  nace con su folio, que asigna el servidor y guarda en el documento. Por tipo
+  de documento, la empresa elige «Autogenerado» (aleatorio, `COT-1A2B3C4D`) o
+  «Con clave» (hasta 5 letras o números y un consecutivo que nunca se reinicia,
+  `VEN-101`); el folio es único dentro de la empresa y cambiar la modalidad no
+  toca lo ya creado (`apps.folios`, `GET/PUT /api/folio-settings/`).
 
 ## Estado
 
@@ -209,6 +215,7 @@ Cobertura mínima: **90 %** (`MIN_COVERAGE` del workflow). Una prueba en rojo, u
 | `apps.clients` | Clientes |
 | `apps.dashboard` | Inicio |
 | `apps.documents` | Documentos |
+| `apps.folios` | Folios de documentos |
 | `apps.leads` | contactos |
 | `apps.legal` | documentos legales |
 | `apps.payments` | Pagos |
