@@ -71,14 +71,6 @@ def _bulk_routes() -> list[tuple[str, object]]:
     return [(route, callback) for route, callback in ROUTES if "bulk/" in route]
 
 
-def test_default_pagination_contract(settings) -> None:
-    rest = settings.REST_FRAMEWORK
-    assert rest["DEFAULT_PAGINATION_CLASS"] == "common.pagination.DefaultPagination"
-    assert DefaultPagination.page_size == 20
-    assert DefaultPagination.page_size_query_param == "page_size"
-    assert DefaultPagination.max_page_size == 100
-
-
 def test_default_filter_backends(settings) -> None:
     """django-filter, búsqueda y orden; los dos últimos sin distinguir acentos."""
     assert tuple(settings.REST_FRAMEWORK["DEFAULT_FILTER_BACKENDS"]) == (

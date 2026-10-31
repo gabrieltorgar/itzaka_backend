@@ -6,6 +6,8 @@ from decimal import Decimal
 from django.db import transaction
 from rest_framework.exceptions import NotFound, ValidationError
 
+from apps.folios.codes import DocumentType
+from apps.folios.services import assign_folio
 from apps.quotes.models import QuoteItem
 from apps.staff.models import Assignment, Worker, WorkerPayment, WorkerService
 
@@ -173,15 +175,18 @@ def pay_worker(
     if project is not None and project.owner_id != owner.id:
         raise ValidationError("Proyecto no encontrado.")
 
-    payment = WorkerPayment.objects.create(
-        owner=owner,
-        worker=worker,
-        project=project,
-        amount=amount,
-        method=method,
-        date=date,
-        note=note,
-    )
+    # El folio y el pago, en la misma transacción (iteracion-25).
+    with transaction.atomic():
+        payment = WorkerPayment.objects.create(
+            owner=owner,
+            folio=assign_folio(owner=owner, document_type=DocumentType.WORKER_PAYMENT),
+            worker=worker,
+            project=project,
+            amount=amount,
+            method=method,
+            date=date,
+            note=note,
+        )
     logger.info(
         "Worker paid",
         extra={"payment_id": str(payment.pk), "worker_id": str(worker.pk)},

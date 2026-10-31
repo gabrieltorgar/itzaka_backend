@@ -2,11 +2,22 @@
 # Check obligatorio en main y develop: "quality-gate" (todas las pruebas en verde y cobertura ≥ 90 %).
 # La cobertura sale de [tool.coverage.run] en pyproject.toml: source = ["src"], omit = migraciones,
 # settings, tests, wsgi/asgi y manage.py.
+# Pines: acciones por SHA con su versión en comentario (Dependabot github-actions los mantiene).
+# RLS (multiempresa, SEC-01): el usuario de CI (postgres) es superusuario a propósito: crea la BD de pruebas y el
+# rol app_rls; las pruebas RLS cambian al rol no dueño con SET LOCAL ROLE (qa-tdd-testing security-tests.md).
+# Nunca agregues -m "not rls" ni --nomigrations al comando de pytest.
+# README sincronizado: scripts/readme_sync.py (vendorizado como test_gate.py) corre aquí, con los settings de Django
+# importables, para que la tabla de la API también se compare; --require-routes hace fallar si no se puede generar.
+# Itzaka: sin --require-routes mientras falte el comando api_routes (django-backend-conventions architecture.md §13,
+# item «TEC Tabla de rutas del README»); hasta entonces el bloque «api» queda sin verificar y lo demás sí se compara.
 name: quality-gate
 on:
   pull_request:
     branches: [main, develop]
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   quality-gate:
@@ -22,13 +33,21 @@ jobs:
           --health-timeout 5s --health-retries 5
     env:
       DATABASE_URL: postgres://postgres:postgres@localhost:5432/test
+      # El bloque de producción (HTTPS, HSTS, cookies Secure) lo verifica test_production_settings_values en un subproceso.
+      DEBUG: "True"
+      SECRET_KEY: "ci-only-not-a-secret"
       MIN_COVERAGE: "0.90"
     steps:
-      - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v7
-      - run: uv sync --all-groups
-      - run: mkdir -p reports
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+      - run: uv sync --locked --all-groups          # falla si uv.lock no corresponde a pyproject.toml
+      - run: rm -rf reports coverage && mkdir -p reports
       - name: Pruebas con cobertura (el resultado lo decide el gate)
         run: uv run pytest --junitxml=reports/junit.xml --cov --cov-report=xml:reports/coverage.xml --cov-report=term || true
       - name: Quality gate
-        run: python3 scripts/test_gate.py --junit reports/junit.xml --cobertura reports/coverage.xml --min "$MIN_COVERAGE"
+        run: >-
+          python3 scripts/test_gate.py --junit reports/junit.xml --cobertura reports/coverage.xml --min "$MIN_COVERAGE"
+          --allow-skip-reason 'got empty parameter set'
+      - name: README sincronizado (git-deploy-ops readme-format.md)
+        run: python3 scripts/readme_sync.py --check --kind backend

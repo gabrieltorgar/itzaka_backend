@@ -8,12 +8,40 @@ from apps.catalog.models import Tariff
 from apps.clients.models import Client
 from apps.planner.models import Plan
 from apps.quotes.models import (
+    MAX_ROOMS_PER_ITEM,
     MAX_VALIDITY_DAYS,
     NOTES_MAX_LENGTH,
+    ROOM_NAME_MAX_LENGTH,
     Quote,
     QuoteItem,
+    QuoteItemRoom,
 )
 from common.fields import OwnedPrimaryKeyRelatedField
+
+
+class QuoteItemRoomInputSerializer(serializers.Serializer):
+    """How much of a line falls in one room of the plan (iteracion-25)."""
+
+    name = serializers.CharField(
+        max_length=ROOM_NAME_MAX_LENGTH,
+        error_messages={
+            "blank": "Escribe el nombre de la habitación",
+            "max_length": (
+                "El nombre de la habitación no puede pasar de "
+                f"{ROOM_NAME_MAX_LENGTH} caracteres"
+            ),
+        },
+    )
+    quantity = serializers.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        error_messages={"invalid": "La cantidad debe ser mayor a 0"},
+    )
+
+    def validate_quantity(self, value: Decimal) -> Decimal:
+        if value <= 0:
+            raise serializers.ValidationError("La cantidad debe ser mayor a 0")
+        return value
 
 
 class QuoteItemInputSerializer(serializers.Serializer):
@@ -45,6 +73,11 @@ class QuoteItemInputSerializer(serializers.Serializer):
     )
     # La midió el plano (US-95). Sin decirlo, conserva lo que la partida era.
     from_plan = serializers.BooleanField(required=False)
+    # Cuánto de ella cae en cada habitación del plano (iteracion-25). Sin
+    # decirlo, al editar conserva el reparto que traía si la cantidad lo alcanza.
+    rooms = QuoteItemRoomInputSerializer(
+        many=True, required=False, max_length=MAX_ROOMS_PER_ITEM
+    )
 
     def validate_quantity(self, value: Decimal) -> Decimal:
         if value <= 0:
@@ -55,6 +88,25 @@ class QuoteItemInputSerializer(serializers.Serializer):
         if value <= 0:
             raise serializers.ValidationError("El precio debe ser mayor a 0")
         return value
+
+    def validate(self, attrs: dict) -> dict:
+        """The rooms of a line are each named once and never exceed the line."""
+        rooms = attrs.get("rooms") or []
+        names = [room["name"] for room in rooms]
+        if len(set(names)) != len(names):
+            raise serializers.ValidationError(
+                {"rooms": ["Cada habitación va una sola vez en la partida"]}
+            )
+        if sum((room["quantity"] for room in rooms), Decimal("0")) > attrs["quantity"]:
+            raise serializers.ValidationError(
+                {
+                    "rooms": [
+                        "Lo repartido entre las habitaciones no puede pasar de la "
+                        "cantidad de la partida"
+                    ]
+                }
+            )
+        return attrs
 
 
 class QuoteWriteSerializer(serializers.Serializer):
@@ -113,10 +165,19 @@ class PlanSyncSerializer(serializers.Serializer):
     items = QuoteItemInputSerializer(many=True)
 
 
+class QuoteItemRoomSerializer(serializers.ModelSerializer):
+    """Read shape of a line's share in one room: its amount is the document's."""
+
+    class Meta:
+        model = QuoteItemRoom
+        fields = ["name", "quantity"]
+
+
 class QuoteItemSerializer(serializers.ModelSerializer):
     """Read shape of a line item, including its computed subtotal."""
 
     subtotal = serializers.DecimalField(max_digits=16, decimal_places=2, read_only=True)
+    rooms = QuoteItemRoomSerializer(many=True, read_only=True)
 
     class Meta:
         model = QuoteItem
@@ -129,6 +190,7 @@ class QuoteItemSerializer(serializers.ModelSerializer):
             "quantity",
             "subtotal",
             "from_plan",
+            "rooms",
         ]
 
 
@@ -144,6 +206,7 @@ class QuoteSerializer(serializers.ModelSerializer):
         model = Quote
         fields = [
             "id",
+            "folio",
             "client",
             "client_name",
             "status",

@@ -183,6 +183,7 @@ class WorkerPaymentSerializer(serializers.ModelSerializer):
         model = WorkerPayment
         fields = [
             "id",
+            "folio",
             "worker",
             "worker_name",
             "project",

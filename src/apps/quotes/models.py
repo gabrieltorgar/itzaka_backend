@@ -5,12 +5,14 @@ time, so later tariff edits never change an already-issued quote (US-05 edge).
 """
 
 from decimal import ROUND_HALF_UP, Decimal
+from functools import partial
 
 from django.conf import settings
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
+from apps.folios.codes import FOLIO_MAX_LENGTH, random_folio
 from common.models import TimestampedModel
 
 #: Días que valen los precios de una cotización si nadie dice otra cosa.
@@ -21,6 +23,13 @@ MAX_VALIDITY_DAYS = 365
 
 #: Lo que caben las observaciones: un par de párrafos, no un contrato.
 NOTES_MAX_LENGTH = 2000
+
+#: Lo que cabe el nombre de una habitación: el mismo largo que el de un plano.
+ROOM_NAME_MAX_LENGTH = 150
+
+#: Entre cuántas habitaciones se reparte una partida, como mucho: más de las
+#: que tiene una casa grande, y un tope para que nadie mande miles.
+MAX_ROOMS_PER_ITEM = 100
 
 
 class Quote(TimestampedModel):
@@ -79,12 +88,26 @@ class Quote(TimestampedModel):
         verbose_name=_("días de vigencia"),
         help_text=_("Cuántos días valen los precios desde la fecha de emisión."),
     )
+    # El folio que imprime el documento (iteracion-25, US-142): lo asigna
+    # apps.folios.services.assign_folio al crearlo y no cambia nunca. El
+    # default es el «Autogenerado», por si algo lo crea fuera del servicio.
+    folio = models.CharField(
+        max_length=FOLIO_MAX_LENGTH,
+        default=partial(random_folio, "COT"),
+        editable=False,
+        verbose_name=_("folio"),
+    )
 
     class Meta:
         db_table = "quotes_quote"
         ordering = ["-created_at"]
         verbose_name = _("cotización")
         verbose_name_plural = _("cotizaciones")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["owner", "folio"], name="quotes_quote_folio_per_owner"
+            )
+        ]
 
     def __str__(self) -> str:
         return f"Cotización {self.pk} — {self.client}"
@@ -145,3 +168,41 @@ class QuoteItem(TimestampedModel):
 
     def __str__(self) -> str:
         return f"{self.name} × {self.quantity}"
+
+
+class QuoteItemRoom(TimestampedModel):
+    """How much of a line falls in one room of its plan (iteracion-25).
+
+    The plan measures a service across every element it hangs from, and the
+    line keeps the sum; this keeps the share of each room so the document can
+    break the quote down by room. What no room claims —a line added by hand, a
+    wall that bounds none— is the line's quantity minus its rooms, which is why
+    the rooms of a line never add up to more than the line.
+    """
+
+    quote_item = models.ForeignKey(
+        QuoteItem,
+        on_delete=models.CASCADE,
+        related_name="rooms",
+        verbose_name=_("servicio cotizado"),
+    )
+    name = models.CharField(
+        max_length=ROOM_NAME_MAX_LENGTH, verbose_name=_("habitación")
+    )
+    quantity = models.DecimalField(
+        max_digits=12, decimal_places=2, verbose_name=_("cantidad")
+    )
+
+    class Meta:
+        db_table = "quotes_quote_item_room"
+        ordering = ["name"]
+        verbose_name = _("cantidad por habitación")
+        verbose_name_plural = _("cantidades por habitación")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["quote_item", "name"], name="quotes_item_room_once"
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.name}: {self.quantity}"

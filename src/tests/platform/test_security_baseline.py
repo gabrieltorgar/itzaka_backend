@@ -8,6 +8,10 @@ static scans over ``src/apps/`` and ``src/common/``. A failing scan prints
 """
 
 import ast
+import json
+import os
+import subprocess
+import sys
 from pathlib import Path
 
 from django.conf import settings as dj_settings
@@ -33,9 +37,9 @@ def _py_files():
 
 def test_drf_defaults_are_secure():
     rf = dj_settings.REST_FRAMEWORK
-    assert "rest_framework.permissions.IsAuthenticated" in rf[
-        "DEFAULT_PERMISSION_CLASSES"
-    ]
+    assert (
+        "rest_framework.permissions.IsAuthenticated" in rf["DEFAULT_PERMISSION_CLASSES"]
+    )
     assert rf.get("DEFAULT_THROTTLE_CLASSES"), "throttling must be on by default"
     for scope in ("anon", "user", "login", "otp", "password_reset"):
         assert scope in rf["DEFAULT_THROTTLE_RATES"], f"missing throttle rate '{scope}'"
@@ -88,6 +92,76 @@ def test_production_https_settings_are_declared():
         "CSRF_TRUSTED_ORIGINS",
     ):
         assert name in source, f"core settings do not declare {name}"
+
+
+def _production_settings() -> subprocess.CompletedProcess:
+    """``core.settings`` en un intérprete limpio con ``DEBUG=False``.
+
+    La suite corre con ``DEBUG=True`` y un ``SECRET_KEY`` de CI (quality-gate):
+    el bloque de producción de ``core/env.py`` solo se ve en otro proceso.
+    """
+    keys = (
+        "DEBUG",
+        "SECURE_SSL_REDIRECT",
+        "SESSION_COOKIE_SECURE",
+        "CSRF_COOKIE_SECURE",
+        "SECURE_HSTS_SECONDS",
+        "SECURE_PROXY_SSL_HEADER",
+        "PASSWORD_HASHERS",
+        "CACHES",
+        "REST_FRAMEWORK",
+    )
+    code = (
+        "import django, json; django.setup(); "
+        "from django.conf import settings as s; "
+        f"print(json.dumps({{k: getattr(s, k, None) for k in {keys!r}}}, default=str))"
+    )
+    env = {
+        **os.environ,
+        "DEBUG": "False",
+        "SECRET_KEY": "x" * 50,
+        "DJANGO_SETTINGS_MODULE": "core.settings",
+        "PYTHONPATH": str(SRC),
+    }
+    return subprocess.run(  # noqa: S603 -- el mismo intérprete, sin shell
+        [sys.executable, "-c", code],
+        cwd=SRC,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
+def test_production_settings_values():
+    """TDD-B03: HTTPS, HSTS, cookies Secure, hasher, caché compartida, solo JSON.
+
+    Mutación: ``SECURE_SSL_REDIRECT = False`` en core/env.py la pone en rojo.
+    ``RECAPTCHA_ENABLED`` no se afirma aquí: sigue a ``RECAPTCHA_SECRET_KEY``.
+    """
+    run = _production_settings()
+    assert run.returncode == 0, run.stderr
+    prod = json.loads(run.stdout)
+
+    assert prod["DEBUG"] is False
+    assert prod["SECURE_SSL_REDIRECT"] is True
+    # Las cookies de la sesión JWT usan SESSION_COOKIE_SECURE (auth_cookies.py).
+    assert prod["SESSION_COOKIE_SECURE"] is True
+    assert prod["CSRF_COOKIE_SECURE"] is True
+    assert prod["SECURE_HSTS_SECONDS"] >= 86_400
+    assert prod["SECURE_PROXY_SSL_HEADER"] == ["HTTP_X_FORWARDED_PROTO", "https"]
+    assert prod["PASSWORD_HASHERS"][0] in {
+        f"django.contrib.auth.hashers.{name}"
+        for name in (
+            "PBKDF2PasswordHasher",
+            "Argon2PasswordHasher",
+            "ScryptPasswordHasher",
+        )
+    }
+    backend = prod["CACHES"]["default"]["BACKEND"].lower()
+    assert "locmem" not in backend, "throttling needs a shared cache"
+    renderers = prod["REST_FRAMEWORK"]["DEFAULT_RENDERER_CLASSES"]
+    assert not any("BrowsableAPIRenderer" in r for r in renderers)
 
 
 # ---------- static scans [SEC-03, API-01, CRD-01]

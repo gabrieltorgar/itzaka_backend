@@ -1,9 +1,14 @@
 # .github/workflows/security.yml — todos los repos de código (backend, frontend, mobile)
 # Check obligatorio en main y develop: "security" (criterios SRV-03 y CRD-03).
-#   - dependencias con vulnerabilidades altas o críticas: pip-audit (uv) y pnpm audit (prod)
-#   - secretos en el historial: gitleaks (imagen oficial, sin licencia de la acción)
-# Excepciones: archivo .security-exceptions (una por línea: <id> <revisar-antes-de YYYY-MM-DD> <motivo>).
-# Una excepción vencida hace fallar el check: se revisa, se renueva con motivo o se corrige.
+#   - dependencias con vulnerabilidades altas o críticas: pip-audit (uv), pnpm audit (prod y dev) y osv-scanner (pubspec.lock, imagen con tag fijo)
+#   - secretos en el historial: gitleaks (imagen oficial fijada por tag + digest, subcomando git; sin licencia de la acción)
+# Falla cerrado: un error de herramienta o del registro es rojo (exit 2), nunca "pasa"; cada ecosistema imprime
+# "auditado <ecosistema>: N paquetes". pnpm sale de "packageManager" en package.json (pnpm@11.x o mayor:
+# pnpm ≤ 10 llama al endpoint de auditoría retirado).
+# Excepciones: archivo .security-exceptions (una por línea: <id GHSA/PYSEC> <revisar-antes-de YYYY-MM-DD> <motivo>),
+# a lo más 90 días adelante. Una excepción vencida o más lejana hace fallar el check: se revisa, se renueva o se corrige.
+# Pines: acciones por SHA con su versión en comentario (Dependabot github-actions); imágenes por tag + digest y
+# pip-audit por versión exacta (a mano, ver security_audit.py). El cron corre sobre la rama por defecto (main).
 name: security
 on:
   pull_request:
@@ -12,21 +17,32 @@ on:
     - cron: "17 13 * * 1"        # lunes: vulnerabilidades nuevas en dependencias que no cambiaron
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   security:
     name: security
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-        with: { fetch-depth: 0 }
-      - name: Secretos en el repositorio (gitleaks)
-        run: docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:latest detect --source /repo --redact --no-banner
-      - uses: astral-sh/setup-uv@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { fetch-depth: 0, persist-credentials: false }
+      - name: Secretos en el repositorio y su historial (gitleaks)
+        run: >-
+          docker run --rm -v "$PWD:/repo"
+          ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f
+          git /repo --redact --no-banner --exit-code 1
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         if: hashFiles('pyproject.toml') != ''
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
         if: hashFiles('pnpm-lock.yaml') != ''
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         if: hashFiles('pnpm-lock.yaml') != ''
         with: { node-version: 22, cache: pnpm }
+      - name: Imagen fijada de osv-scanner (pubspec.lock; misma referencia que OSV_IMAGE de security_audit.py)
+        if: hashFiles('pubspec.lock') != ''
+        run: docker pull ghcr.io/google/osv-scanner:v2.6.0@sha256:afd838850ac1a0fcc15ff4a041dc9ba11123c3f0d2666217a5f0fcf9222b55fa
+      - name: Autoprueba del auditor
+        run: python3 scripts/security_audit.py --self-test
       - name: Dependencias vulnerables
         run: python3 scripts/security_audit.py --min-severity high

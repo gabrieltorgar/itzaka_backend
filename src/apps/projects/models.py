@@ -6,11 +6,13 @@ quantity). Earned value = advanced quantity × the item's snapshotted unit price
 """
 
 from decimal import Decimal
+from functools import partial
 
 from django.conf import settings
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
+from apps.folios.codes import FOLIO_MAX_LENGTH, random_folio
 from common.models import TimestampedModel
 from common.uploads import evidence_upload_to
 
@@ -40,12 +42,26 @@ class Project(TimestampedModel):
         default=Status.IN_PROGRESS,
         verbose_name=_("estado"),
     )
+    # El folio que imprime el documento (iteracion-25, US-142): lo asigna
+    # apps.folios.services.assign_folio al crearlo y no cambia nunca. El
+    # default es el «Autogenerado», por si algo lo crea fuera del servicio.
+    folio = models.CharField(
+        max_length=FOLIO_MAX_LENGTH,
+        default=partial(random_folio, "PRO"),
+        editable=False,
+        verbose_name=_("folio"),
+    )
 
     class Meta:
         db_table = "projects_project"
         ordering = ["-created_at"]
         verbose_name = _("proyecto")
         verbose_name_plural = _("proyectos")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["owner", "folio"], name="projects_project_folio_per_owner"
+            )
+        ]
 
     def __str__(self) -> str:
         return f"Proyecto {self.pk}"

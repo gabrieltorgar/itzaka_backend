@@ -48,7 +48,8 @@ def test_the_legal_documents_ship_with_the_function() -> None:
 
     assert documentos, "no hay documentos legales que revisar"
     for documento in documentos:
-        assert not excluded(str(documento.relative_to(REPO))), documento.name
+        # Vercel compara rutas con «/»: en Windows, str() daría «\».
+        assert not excluded(documento.relative_to(REPO).as_posix()), documento.name
 
 
 def test_tests_and_repo_docs_still_stay_out() -> None:

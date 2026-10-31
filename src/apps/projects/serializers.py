@@ -111,6 +111,7 @@ class ProjectListSerializer(serializers.ModelSerializer):
         model = Project
         fields = [
             "id",
+            "folio",
             "quote",
             "client_name",
             "status",
@@ -142,6 +143,7 @@ class ProjectSerializer(ProjectListSerializer):
     class Meta(ProjectListSerializer.Meta):
         fields = [
             "id",
+            "folio",
             "quote",
             "client_name",
             "status",
