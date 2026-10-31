@@ -14,7 +14,8 @@ con su comprobante, hasta el cierre del proyecto con documento resumen.
   eliminación de la cuenta.
 - **Catálogo, clientes y cotizaciones:** servicios con su unidad y precio,
   clientes y cotizaciones con total automático, con su documento PDF que se
-  descarga o se envía por correo.
+  descarga o se envía por correo; la que sale de un plano guarda cuánto de cada
+  partida cae en cada habitación, para desglosarla por habitación.
 - **Proyectos, avances y cierre:** una cotización se vuelve proyecto; los avances
   se registran por cantidad con evidencia fotográfica y el cierre entrega su
   documento resumen.
@@ -26,12 +27,18 @@ con su comprobante, hasta el cierre del proyecto con documento resumen.
 - **Inicio:** el resumen de la cuenta: obras en curso, lo cotizado y lo cobrado.
 - **Colaboradores:** el administrador invita por correo; cada persona trabaja en
   las empresas que la invitan y sólo el administrador decide la organización.
+- **Folios de documentos:** cada cotización, estado de proyecto y comprobante
+  nace con su folio, que asigna el servidor y guarda en el documento. Por tipo
+  de documento, la empresa elige «Autogenerado» (aleatorio, `COT-1A2B3C4D`) o
+  «Con clave» (hasta 5 letras o números y un consecutivo que nunca se reinicia,
+  `VEN-101`); el folio es único dentro de la empresa y cambiar la modalidad no
+  toca lo ya creado (`apps.folios`, `GET/PUT /api/folio-settings/`).
 
 ## Estado
 
 <!-- readme:auto:version -->
 
-**Versión:** 3.11.0 — `pyproject.toml` · historial en [CHANGELOG.md](CHANGELOG.md)
+**Versión:** 4.0.0 — `pyproject.toml` · historial en [CHANGELOG.md](CHANGELOG.md)
 
 <!-- /readme:auto:version -->
 
@@ -83,7 +90,7 @@ Fuente: `pyproject.toml`; versiones exactas en `uv.lock`.
 <!-- readme:auto:requisitos -->
 
 - Python `>=3.12` (`requires-python`)
-- [uv](https://docs.astral.sh/uv/): entorno y dependencias
+- [uv](https://docs.astral.sh/uv/): entorno y dependencias (no hay `requirements.txt`)
 - PostgreSQL accesible por `DATABASE_URL`
 - Git
 
@@ -114,8 +121,14 @@ Archivo: `src/core/.env.example` → cópialo a `src/core/.env`. Aquí solo van 
 | `DEBUG` | — |
 | `SECRET_KEY` | — |
 | `ALLOWED_HOSTS` | — |
-| `CORS_ALLOWED_ORIGINS` | — |
+| `CORS_ALLOWED_ORIGINS` | Exact origins, comma separated, never wildcards (also trusted for CSRF). |
+| `CSRF_TRUSTED_ORIGINS` | Extra exact origins trusted for CSRF, besides the CORS ones. |
+| `CSRF_COOKIE_DOMAIN` | Empty: host-only cookie (the SPA calls /api on its own domain). |
+| `CSRF_COOKIE_NAME` | Per environment when two share a domain; the SPA repeats it (VITE_CSRF_COOKIE_NAME). |
 | `DATABASE_URL` | — |
+| `CONN_MAX_AGE` | Neon: DATABASE_URL is the pooled host (-pooler, transaction mode); keep 0 there. |
+| `DATABASE_URL_UNPOOLED` | Direct (unpooled) host, for migrate and createcachetable (never the pooler). |
+| `DATABASE_URL_MIGRATIONS` | Direct host with the owner role (multi-company); preferred for migrations. |
 | `LOG_DIR` | — |
 | `OTP_UNIVERSAL_CODE` | — |
 | `OTP_UNIVERSAL_CODE_ENABLED` | Only opens accounts while mail is not configured, and only where enabled: on by default with DEBUG, off in production unless set on purpose. |
@@ -164,10 +177,11 @@ Archivo: `src/core/.env.example` → cópialo a `src/core/.env`. Aquí solo van 
 
 Pasos de `quality-gate` (`.github/workflows/quality-gate.yml`), en orden; los mismos comandos sirven en local (con el valor de `MIN_COVERAGE` ya puesto):
 
-1. `uv sync --all-groups`
-2. `mkdir -p reports`
+1. `uv sync --locked --all-groups`
+2. `rm -rf reports coverage && mkdir -p reports`
 3. Pruebas con cobertura (el resultado lo decide el gate): `uv run pytest --junitxml=reports/junit.xml --cov --cov-report=xml:reports/coverage.xml --cov-report=term`
-4. Quality gate: `python3 scripts/test_gate.py --junit reports/junit.xml --cobertura reports/coverage.xml --min 0.90`
+4. Quality gate: `python3 scripts/test_gate.py --junit reports/junit.xml --cobertura reports/coverage.xml --min 0.90 --allow-skip-reason 'got empty parameter set'`
+5. README sincronizado (git-deploy-ops readme-format.md): `python3 scripts/readme_sync.py --check --kind backend`
 
 Cobertura mínima: **90 %** (`MIN_COVERAGE` del workflow). Una prueba en rojo, una omitida sin motivo permitido o una cobertura menor bloquean el merge.
 
@@ -202,6 +216,7 @@ Cobertura mínima: **90 %** (`MIN_COVERAGE` del workflow). Una prueba en rojo, u
 | `apps.clients` | Clientes |
 | `apps.dashboard` | Inicio |
 | `apps.documents` | Documentos |
+| `apps.folios` | Folios de documentos |
 | `apps.leads` | contactos |
 | `apps.legal` | documentos legales |
 | `apps.payments` | Pagos |
@@ -240,8 +255,9 @@ responden `{requested, processed, failed}` (`common/bulk.py`).
 
 - Web: sesión con JWT en cookies `HttpOnly` que emite la API
   (`POST /api/auth/login/`; `POST /api/auth/refresh/` rota el refresh y el
-  anterior queda en la lista negra; `POST /api/auth/logout/`). Django pone la
-  cookie `csrftoken` y cada escritura lleva la cabecera `X-CSRFToken`. El
+  anterior queda en la lista negra; `POST /api/auth/logout/`). La SPA pide
+  `GET /api/auth/csrf/` al arrancar: deja la cookie CSRF (`CSRF_COOKIE_NAME`,
+  `csrftoken` por omisión) y cada escritura lleva la cabecera `X-CSRFToken`. El
   navegador nunca lee ni envía tokens: no hay `Authorization: Bearer` para la
   web, y la aplicación llama a la API por su propio dominio (`/api/*`).
 - Registro con correo y contraseña; la cuenta se confirma con un código de 6
@@ -310,12 +326,18 @@ Verificación de los formularios públicos en el servidor (`common/recaptcha.py`
 
 ### Base de datos — Neon
 
-PostgreSQL de Neon por entorno, en `DATABASE_URL`.
+PostgreSQL de Neon por entorno. La API usa `DATABASE_URL`, el host con pooler
+(PgBouncer en modo transacción): conexiones de una petición
+(`CONN_MAX_AGE`, 0 por omisión), revisadas antes de reusarse y sin cursores del
+servidor (`core/settings.py`). Las migraciones y la tabla de caché van por el
+host directo: `DATABASE_URL_MIGRATIONS` (rol dueño) o, si no está,
+`DATABASE_URL_UNPOOLED`; sin ninguna de las dos, el build se detiene.
 
 ## Administración
 
 - Panel en `/admin/` del dominio de la API (Django Unfold); cada modelo de
-  `apps/` tiene su registro.
+  `apps/` tiene su registro, y las sesiones emitidas y anuladas (lista negra
+  de simplejwt) se consultan ahí, de solo lectura las emitidas.
 - Acceso: sólo el equipo de Itzaka, con un superusuario creado con
   `createsuperuser`; las cuentas de los clientes y sus colaboradores no entran
   al admin. Las credenciales nunca viven en el repositorio ni en este README.
@@ -329,8 +351,8 @@ Vercel (`vercel.json`):
 - Despliegan: `develop`, `main` (el resto de las ramas no despliega) — `git.deploymentEnabled`.
 - Build, en orden:
   1. `uv sync --frozen --no-dev`
-  2. `uv run --no-sync python src/manage.py migrate --noinput`
-  3. `uv run --no-sync python src/manage.py createcachetable`
+  2. `DATABASE_URL="${DATABASE_URL_MIGRATIONS:-${DATABASE_URL_UNPOOLED:?falta DATABASE_URL_MIGRATIONS o DATABASE_URL_UNPOOLED}}" uv run --no-sync python src/manage.py migrate --noinput`
+  3. `DATABASE_URL="${DATABASE_URL_MIGRATIONS:-$DATABASE_URL_UNPOOLED}" uv run --no-sync python src/manage.py createcachetable`
 - Función: `wsgi.py` con `excludeFiles`.
 
 <!-- /readme:auto:despliegue -->
@@ -339,6 +361,10 @@ Vercel (`vercel.json`):
   aplicación la llama por su propio dominio, https://itzaka.grupotorresmucino.com/api/.
 - Las variables por entorno (sólo nombres) viven en `tecnico/infraestructura.md`
   de la memoria del proyecto, que es privada.
+- Cada entorno de Vercel (Production y Preview) necesita, además de
+  `DATABASE_URL` (pooler), `DATABASE_URL_UNPOOLED` o `DATABASE_URL_MIGRATIONS`:
+  el build migra por ahí. Vercel instala desde `uv.lock` (no hay
+  `requirements.txt`).
 - Verificación después de desplegar: `/api/health/` responde 200 y
   `/admin/login/` carga con sus estilos.
 

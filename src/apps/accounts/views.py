@@ -3,6 +3,8 @@
 import uuid
 
 from django.middleware.csrf import get_token
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import ensure_csrf_cookie
 from rest_framework import status
 from rest_framework.exceptions import (
     AuthenticationFailed,
@@ -61,6 +63,22 @@ from common.auth_cookies import (
     set_token_cookies,
 )
 from common.recaptcha import Verdict, guard_public_form
+
+
+@method_decorator(ensure_csrf_cookie, name="get")
+class CsrfCookieView(APIView):
+    """GET /api/auth/csrf/ — deja la cookie CSRF que la SPA repite en X-CSRFToken.
+
+    Pública a propósito: no devuelve datos ni cambia nada, y la SPA la llama al
+    arrancar y antes de entrar, cuando todavía no hay sesión. Sin autenticación,
+    una cookie de acceso vencida no la convierte en 401.
+    """
+
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
+    def get(self, request: Request) -> Response:
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class RegisterView(APIView):

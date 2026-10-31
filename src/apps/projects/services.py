@@ -6,6 +6,8 @@ from decimal import Decimal
 from django.db import transaction
 from rest_framework.exceptions import ValidationError
 
+from apps.folios.codes import DocumentType
+from apps.folios.services import assign_folio
 from apps.projects.models import Evidence, Progress, Project
 from apps.quotes.models import Quote, QuoteItem
 from common.validators import IMAGES, validate_upload
@@ -32,7 +34,11 @@ def start_project(*, owner, quote: Quote) -> Project:
         raise ValidationError("Esta cotización ya tiene un proyecto asociado")
 
     with transaction.atomic():
-        project = Project.objects.create(owner=owner, quote=quote)
+        project = Project.objects.create(
+            owner=owner,
+            quote=quote,
+            folio=assign_folio(owner=owner, document_type=DocumentType.PROJECT),
+        )
         quote.status = Quote.Status.IN_PROJECT
         quote.save(update_fields=["status", "updated_at"])
     logger.info("Project started", extra={"project_id": str(project.pk)})

@@ -1,11 +1,11 @@
 """Capas e higiene (iteracion-13 #4: MAN-01 y ARQ-B01; iteracion-14 #3).
 
 Las vistas orquestan: las consultas viven en selectors.py y las reglas en
-services.py. Y requirements.txt —que Vercel usa para instalar la función— no
-puede quedarse atrás de uv.lock.
+services.py. Y las dependencias tienen una sola fuente, pyproject.toml + uv.lock
+(iteracion-25 #8): Vercel instala de uv.lock y security_audit.py lo audita.
 """
 
-import subprocess
+import re
 from pathlib import Path
 
 SRC = Path(__file__).resolve().parents[2]
@@ -19,9 +19,7 @@ def test_views_hold_no_orm_queries():
         for n, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1)
         if ".objects." in line
     ]
-    assert not offenders, "las consultas van en selectors.py:\n" + "\n".join(
-        offenders
-    )
+    assert not offenders, "las consultas van en selectors.py:\n" + "\n".join(offenders)
 
 
 def test_data_belongs_to_the_company_not_to_whoever_asks():
@@ -40,30 +38,17 @@ def test_data_belongs_to_the_company_not_to_whoever_asks():
     assert not offenders, "usa account_of(request):\n" + "\n".join(offenders)
 
 
-def test_requirements_txt_is_the_lockfile_exported():
-    exported = subprocess.run(
-        [  # noqa: S607 -- uv del entorno, sin shell
-            "uv",
-            "export",
-            "--frozen",
-            "--no-dev",
-            "--no-hashes",
-            "--no-emit-project",
-            "--format",
-            "requirements-txt",
-        ],
-        cwd=REPO,
-        capture_output=True,
-        text=True,
-        check=True,
-    ).stdout
-
-    def body(text: str) -> list[str]:
-        return [line for line in text.splitlines() if not line.startswith("#")]
-
-    committed = (REPO / "requirements.txt").read_text(encoding="utf-8")
-    assert body(committed) == body(exported), (
-        "requirements.txt no coincide con uv.lock: corre "
-        "`uv export --no-dev --no-hashes --no-emit-project "
-        "--format requirements-txt -o requirements.txt`"
+def test_dependency_manifest_is_uv_only():
+    """ARQ-B01: sin requirements*.txt, Pipfile ni poetry.lock junto a uv."""
+    manifest = re.compile(r"requirements[^/]*\.txt|Pipfile(\.lock)?|poetry\.lock")
+    stray = [
+        str(path.relative_to(REPO))
+        for path in [*REPO.iterdir(), *SRC.rglob("*")]
+        if manifest.fullmatch(path.name)
+    ]
+    assert not stray, (
+        "pyproject.toml + uv.lock son la única fuente (Vercel instala de uv.lock "
+        f"y pip-audit lo audita): borra {stray}"
     )
+    assert (REPO / "pyproject.toml").is_file()
+    assert (REPO / "uv.lock").is_file()

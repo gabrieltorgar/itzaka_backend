@@ -13,6 +13,9 @@ from django.conf import settings
 from rest_framework import status
 from rest_framework.test import APIClient
 
+from apps.accounts.tests.factories import UserFactory
+from apps.legal.tests.consent import accepted
+from apps.team.tests.factories import InvitationFactory
 from common.auth_cookies import ACCESS_COOKIE, REFRESH_COOKIE
 
 LOGIN = "/api/auth/login/"
@@ -175,3 +178,51 @@ def test_lifetimes_rotation_and_blacklist() -> None:
     assert jwt["BLACKLIST_AFTER_ROTATION"] is True
     assert "rest_framework_simplejwt.token_blacklist" in settings.INSTALLED_APPS
     assert settings.CSRF_COOKIE_HTTPONLY is False
+
+
+def claves(obj):
+    """Todas las claves de un JSON, también las anidadas."""
+    if isinstance(obj, dict):
+        for clave, valor in obj.items():
+            yield clave
+            yield from claves(valor)
+    elif isinstance(obj, list):
+        for elemento in obj:
+            yield from claves(elemento)
+
+
+def solo_en_cookies(response) -> None:
+    """La sesión llega en cookies HttpOnly y el cuerpo no trae ningún token."""
+    assert response.status_code in (status.HTTP_200_OK, status.HTTP_201_CREATED)
+    assert {"access", "refresh"}.isdisjoint(claves(response.json()))
+    cuerpo = response.content.decode()
+    for nombre in (ACCESS_COOKIE, REFRESH_COOKIE):
+        valor = response.cookies[nombre].value
+        assert valor
+        assert valor not in cuerpo
+
+
+@pytest.mark.django_db
+def test_web_auth_responses_carry_no_tokens(api_client, cuenta) -> None:
+    """CRD-02.1 · API-03 · iteracion-24 #2 — Ninguna respuesta que abre sesión
+    deja un token donde un script lo lea: entrar, renovar, cambiar la contraseña
+    y aceptar una invitación."""
+    solo_en_cookies(entrar(api_client))
+    solo_en_cookies(api_client.post(REFRESH, {}, format="json"))
+    solo_en_cookies(
+        api_client.post(
+            PASSWORD,
+            {"current_password": "testpass123", "new_password": "OtraClave#2026"},
+            format="json",
+        )
+    )
+
+    admin = UserFactory(email="admin@estudioreyes.mx")
+    InvitationFactory(account=admin, email="bea@estudio.mx", token="enlace-bea")
+    solo_en_cookies(
+        APIClient().post(
+            "/api/invitations/enlace-bea/accept/",
+            {"password": "Teja-Roja-81", **accepted()},
+            format="json",
+        )
+    )

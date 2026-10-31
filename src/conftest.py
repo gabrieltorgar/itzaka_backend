@@ -8,7 +8,7 @@ from apps.accounts.tests.factories import UserFactory
 
 
 @pytest.fixture(autouse=True)
-def _local_cache(settings):
+def _isolated_cache(settings):
     """Caché en memoria y vacía en cada prueba: los límites no se arrastran."""
     settings.CACHES = {
         "default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}

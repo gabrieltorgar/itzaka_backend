@@ -1,14 +1,20 @@
-# .github/dependabot.yml — criterio SRV-03. Abre PRs semanales contra develop; nunca se fusionan sin quality gate.
+# .github/dependabot.yml — criterio SRV-03. PRs semanales de versiones contra develop, con 7 días de espera tras
+# cada publicación (cooldown; no aplica a advisories). Un PR de Dependabot nunca se fusiona tal cual: se vuelve el
+# item "TEC Actualiza <paquete> a <versión>" de la siguiente iteración y el PR se cierra citándolo.
+# Las security updates de Dependabot van desactivadas (siempre apuntan a la rama por defecto, main): un advisory
+# entra por el modo PARCHE DE SEGURIDAD (fase-b-configuracion.md, paso 2).
 version: 2
 updates:
-  - package-ecosystem: "uv"            # pyproject.toml + uv.lock
+  - package-ecosystem: "uv"            # backend (pyproject.toml + uv.lock); usa "pip" si Dependabot aún no soporta uv en la cuenta
     directory: "/"
     target-branch: "develop"
     schedule: { interval: "weekly", day: "monday" }
+    cooldown: { default-days: 7 }
     open-pull-requests-limit: 5
     groups:
       menores: { update-types: ["minor", "patch"] }
-  - package-ecosystem: "github-actions"
+  - package-ecosystem: "github-actions" # mantiene los SHA fijados y su comentario de versión
     directory: "/"
     target-branch: "develop"
     schedule: { interval: "monthly" }
+    cooldown: { default-days: 7 }

@@ -3,7 +3,9 @@
 from django.contrib import admin
 from unfold.admin import ModelAdmin, TabularInline
 
-from apps.quotes.models import Quote, QuoteItem
+from apps.folios.admin import FolioAssignedAdminMixin
+from apps.folios.codes import DocumentType
+from apps.quotes.models import Quote, QuoteItem, QuoteItemRoom
 
 
 class QuoteItemInline(TabularInline):
@@ -12,10 +14,18 @@ class QuoteItemInline(TabularInline):
 
 
 @admin.register(Quote)
-class QuoteAdmin(ModelAdmin):
-    list_display = ("id", "client", "status", "plan", "owner", "created_at")
+class QuoteAdmin(FolioAssignedAdminMixin, ModelAdmin):
+    folio_document_type = DocumentType.QUOTE
+    list_display = ("folio", "client", "status", "plan", "owner", "created_at")
     list_filter = ("status",)
+    search_fields = ("folio", "client__name")
+    readonly_fields = ("folio",)
     inlines = [QuoteItemInline]
+
+
+class QuoteItemRoomInline(TabularInline):
+    model = QuoteItemRoom
+    extra = 0
 
 
 @admin.register(QuoteItem)
@@ -25,3 +35,13 @@ class QuoteItemAdmin(ModelAdmin):
     list_display = ("name", "quote", "quantity", "unit_price", "from_plan")
     search_fields = ("name", "quote__client__name")
     list_select_related = ("quote",)
+    inlines = [QuoteItemRoomInline]
+
+
+@admin.register(QuoteItemRoom)
+class QuoteItemRoomAdmin(ModelAdmin):
+    """Lo que cae en cada habitación (iteracion-25); se edita en su partida."""
+
+    list_display = ("name", "quote_item", "quantity")
+    search_fields = ("name", "quote_item__name")
+    list_select_related = ("quote_item",)
