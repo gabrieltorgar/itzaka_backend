@@ -456,6 +456,53 @@ class TestAmountsComeFromTheServer:
         [row] = listed.data["results"]
         assert Decimal(row["total"]) == Decimal("5100.00")
 
+    def test_amounts_and_status_sent_with_rooms_are_ignored(
+        self, authenticated_client, user
+    ) -> None:
+        """VAL-05 · US-10 · US-11 · US-12 — con habitaciones (iteracion-31).
+
+        Un total, un subtotal o un estado mandados desde la pantalla, al crear
+        y al corregir (también con habitaciones), no cambian lo que la
+        cotización cobra; lo demás de la petición sí se guarda (control: las
+        observaciones).
+        """
+        client, muro, _zocalo = build_catalog(user)
+        forged = {
+            "client": str(client.id),
+            "total": "1.00",
+            "status": "in_project",
+            "notes": "Incluye material",
+            "rooms": [{"name": "Cocina"}],
+            "items": [
+                {
+                    "tariff": str(muro.id),
+                    "quantity": "10",
+                    "subtotal": "1.00",
+                    "rooms": [{"name": "Cocina", "quantity": "10"}],
+                }
+            ],
+        }
+
+        created = authenticated_client.post(QUOTES_URL, forged, format="json")
+
+        assert created.status_code == status.HTTP_201_CREATED, created.data
+        assert Decimal(created.data["total"]) == Decimal("3500.00")
+        assert Decimal(created.data["items"][0]["subtotal"]) == Decimal("3500.00")
+        assert created.data["status"] == Quote.Status.DRAFT
+        assert created.data["notes"] == "Incluye material"
+
+        forged["items"][0]["quantity"] = "2"
+        forged["items"][0]["rooms"] = [{"name": "Cocina", "quantity": "2"}]
+        forged["notes"] = "Sin material"
+        updated = authenticated_client.put(
+            detail_url(created.data["id"]), forged, format="json"
+        )
+
+        assert updated.status_code == status.HTTP_200_OK, updated.data
+        assert Decimal(updated.data["total"]) == Decimal("700.00")
+        assert updated.data["status"] == Quote.Status.DRAFT
+        assert updated.data["notes"] == "Sin material"
+
 
 @pytest.mark.django_db
 class TestDeleteQuote:
@@ -530,55 +577,3 @@ class TestDeleteQuote:
         response = authenticated_client.delete(detail_url(quote.id))
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
-
-
-@pytest.mark.django_db
-class TestTheServerComputesTheAmounts:
-    """VAL-05: el total, los subtotales y el estado los pone el sistema."""
-
-    def test_a_total_sent_by_the_client_is_ignored(
-        self, authenticated_client, user
-    ) -> None:
-        """VAL-05 · US-10 · US-11 · US-12 — Criterio: Importes - Los calcula el sistema.
-
-        Un total, un subtotal o un estado mandados desde la pantalla, al crear
-        y al corregir (también con habitaciones), no cambian lo que la
-        cotización cobra; lo demás de la petición sí se guarda (control: las
-        observaciones).
-        """
-        client, muro, _zocalo = build_catalog(user)
-        forged = {
-            "client": str(client.id),
-            "total": "1.00",
-            "status": "in_project",
-            "notes": "Incluye material",
-            "rooms": [{"name": "Cocina"}],
-            "items": [
-                {
-                    "tariff": str(muro.id),
-                    "quantity": "10",
-                    "subtotal": "1.00",
-                    "rooms": [{"name": "Cocina", "quantity": "10"}],
-                }
-            ],
-        }
-
-        created = authenticated_client.post(QUOTES_URL, forged, format="json")
-
-        assert created.status_code == status.HTTP_201_CREATED, created.data
-        assert Decimal(created.data["total"]) == Decimal("3500.00")
-        assert Decimal(created.data["items"][0]["subtotal"]) == Decimal("3500.00")
-        assert created.data["status"] == Quote.Status.DRAFT
-        assert created.data["notes"] == "Incluye material"
-
-        forged["items"][0]["quantity"] = "2"
-        forged["items"][0]["rooms"] = [{"name": "Cocina", "quantity": "2"}]
-        forged["notes"] = "Sin material"
-        updated = authenticated_client.put(
-            detail_url(created.data["id"]), forged, format="json"
-        )
-
-        assert updated.status_code == status.HTTP_200_OK, updated.data
-        assert Decimal(updated.data["total"]) == Decimal("700.00")
-        assert updated.data["status"] == Quote.Status.DRAFT
-        assert updated.data["notes"] == "Sin material"
