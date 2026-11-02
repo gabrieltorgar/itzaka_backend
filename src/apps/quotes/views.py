@@ -27,6 +27,12 @@ from common.permissions import IsVerifiedUser
 from common.views import TenantModelViewSet
 
 
+def _room_names(data: dict) -> list[str] | None:
+    """The «Habitaciones» section sent, as names; ``None`` when not sent."""
+    rooms = data.get("rooms")
+    return None if rooms is None else [room["name"] for room in rooms]
+
+
 class QuoteViewSet(TenantModelViewSet):
     """CRUD for the account's quotes; totals are computed from line items.
 
@@ -64,6 +70,7 @@ class QuoteViewSet(TenantModelViewSet):
             notes=data.get("notes"),
             validity_days=data.get("validity_days"),
             plan=data.get("plan"),
+            rooms=_room_names(data),
         )
         return Response(self._read(quote), status=status.HTTP_201_CREATED)
 
@@ -76,6 +83,7 @@ class QuoteViewSet(TenantModelViewSet):
             items_data=data["items"],
             notes=data.get("notes"),
             validity_days=data.get("validity_days"),
+            rooms=_room_names(data),
         )
         return Response(self._read(quote))
 

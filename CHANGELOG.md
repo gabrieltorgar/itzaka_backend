@@ -3,6 +3,11 @@
 Todas las notas de cambios relevantes de la API. El formato sigue
 [Keep a Changelog](https://keepachangelog.com/es-ES/) y versionado semántico.
 
+## [Unreleased] — En curso
+
+### Added
+- **quotes (models, serializers, services, selectors, views, admin, migración 0010) · tests/security/test_rls — US-10 · US-11 · US-12 Agrupar por habitación una cotización hecha a mano**: La cotización tiene su apartado «Habitaciones»: el modelo nuevo `QuoteRoom` (`quotes_quote_room`: nombre de hasta 150 caracteres, su orden y una sola vez por cotización sin importar mayúsculas), con RLS por empresa desde su migración (`0010_habitaciones_de_la_cotizacion`, como 0009) y registrado en el admin de Unfold, también como inline de la cotización. `POST` y `PUT /api/quotes/` aceptan `rooms: [{name}]` (opcional: sin él, la cotización conserva el apartado que tenía, así que una pantalla anterior no lo borra; 100 como mucho); un nombre vacío, largo o repetido (sin importar mayúsculas ni espacios) es un 400 en su fila (`{"rooms": {"1": {"name": [...]}}}`) y no guarda nada. Una partida agregada a mano va en una habitación con el `rooms` de partida que ya existía (`[{name, quantity}]` con toda su cantidad). La lectura (`GET /api/quotes/` y `/{id}/`) trae `rooms`: las del apartado en su orden y, detrás, en orden alfabético, las que usan sus partidas sin estar en él; así las cotizaciones de antes y las del plano muestran sus habitaciones sin migrar datos. Toda habitación que usa una partida entra al apartado, y la partida toma la escritura del apartado («cocina» y «Cocina» son una sola). Volver a cotizar desde el plano (`plan-sync`) suma sus habitaciones sin repetirlas y no toca las partidas a mano. Lo que midió el plano conserva su reparto como antes. El reparto de una partida tampoco repite una habitación sin importar mayúsculas. Pruebas: `quotes/tests/test_quote_rooms.py` (16, con VAL-01 y SEC-01) y `tests/security/test_rls.py` (la tabla nueva por `quote__owner`). (iteracion-31 #1)
+
 ## [7.2.0] — 2026-11-01 · iteracion-30: el dominio de la cookie CSRF se deduce de la app y la API (con revisión de despliegue), y la imagen de acceso como fondo del panel en escritorio
 
 ### Changed
