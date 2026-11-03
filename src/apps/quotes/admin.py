@@ -5,12 +5,19 @@ from unfold.admin import ModelAdmin, TabularInline
 
 from apps.folios.admin import FolioAssignedAdminMixin
 from apps.folios.codes import DocumentType
-from apps.quotes.models import Quote, QuoteItem, QuoteItemRoom
+from apps.quotes.models import Quote, QuoteItem, QuoteItemRoom, QuoteRoom
 from common.admin import ProtectedFieldsAdminMixin
 
 
 class QuoteItemInline(TabularInline):
     model = QuoteItem
+    extra = 0
+
+
+class QuoteRoomInline(TabularInline):
+    """El apartado «Habitaciones» de la cotización (iteracion-31)."""
+
+    model = QuoteRoom
     extra = 0
 
 
@@ -24,7 +31,7 @@ class QuoteAdmin(FolioAssignedAdminMixin, ProtectedFieldsAdminMixin, ModelAdmin)
     list_filter = ("status",)
     search_fields = ("folio", "client__name")
     readonly_fields = ("folio",)
-    inlines = [QuoteItemInline]
+    inlines = [QuoteRoomInline, QuoteItemInline]
 
 
 class QuoteItemRoomInline(TabularInline):
@@ -49,3 +56,12 @@ class QuoteItemRoomAdmin(ModelAdmin):
     list_display = ("name", "quote_item", "quantity")
     search_fields = ("name", "quote_item__name")
     list_select_related = ("quote_item",)
+
+
+@admin.register(QuoteRoom)
+class QuoteRoomAdmin(ModelAdmin):
+    """Las habitaciones de cada cotización (iteracion-31); se editan en ella."""
+
+    list_display = ("name", "quote", "position")
+    search_fields = ("name", "quote__folio")
+    list_select_related = ("quote",)

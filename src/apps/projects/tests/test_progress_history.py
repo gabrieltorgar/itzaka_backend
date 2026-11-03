@@ -243,7 +243,10 @@ class TestAmountsOfAProgressComeFromTheServer:
     def test_a_progress_ignores_earned_value_and_labor_price(
         self, authenticated_client, user
     ) -> None:
-        """VAL-05 · SEC-03.3 - Al registrar y al corregir, con control positivo."""
+        """VAL-05 · SEC-03.3 · US-15 · US-113 - Al registrar y al corregir.
+
+        Con control positivo: la cantidad sí cambia.
+        """
         project, muro, _zocalo = make_project(user)
         juan = worker_who_does(user, muro, "90")
         forged = {"earned_value": "999999", "labor_unit_price": "5000"}
@@ -276,6 +279,31 @@ class TestAmountsOfAProgressComeFromTheServer:
         assert entry.quantity == Decimal("5")
         assert entry.labor_unit_price == Decimal("90")
         assert Decimal(corrected.data["earned_value"]) == Decimal("1750.00")
+
+    def test_changing_who_did_it_ignores_a_forged_price(
+        self, authenticated_client, user
+    ) -> None:
+        """VAL-05 · US-113 - Corregir un avance cambiando quién lo hizo.
+
+        El precio de mano de obra sale del reparto de la persona nueva y lo
+        ganado de la cotización, aunque la petición traiga otros (iteracion-31).
+        """
+        project, muro, _zocalo = make_project(user)
+        juan = worker_who_does(user, muro, "90", name="Juan")
+        ana = worker_who_does(user, muro, "110", name="Ana")
+        entry = advance(project, muro, "5", worker=juan)
+
+        response = authenticated_client.patch(
+            progress_url(entry.id),
+            {"worker": str(ana.id), "labor_unit_price": "1", "earned_value": "1"},
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        entry.refresh_from_db()
+        assert entry.worker == ana
+        assert entry.labor_unit_price == Decimal("110")
+        assert Decimal(response.data["earned_value"]) == Decimal("1750.00")
 
 
 @pytest.mark.django_db

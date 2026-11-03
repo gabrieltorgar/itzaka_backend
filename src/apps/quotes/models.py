@@ -10,6 +10,7 @@ from functools import partial
 from django.conf import settings
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
+from django.db.models.functions import Lower
 from django.utils.translation import gettext_lazy as _
 
 from apps.folios.codes import FOLIO_MAX_LENGTH, random_folio
@@ -30,6 +31,14 @@ ROOM_NAME_MAX_LENGTH = 150
 #: Entre cuántas habitaciones se reparte una partida, como mucho: más de las
 #: que tiene una casa grande, y un tope para que nadie mande miles.
 MAX_ROOMS_PER_ITEM = 100
+
+#: Cuántas habitaciones lleva una cotización, como mucho: el mismo tope.
+MAX_ROOMS_PER_QUOTE = 100
+
+
+def room_key(name: str) -> str:
+    """Two names are the same room regardless of case and spacing (iteracion-31)."""
+    return " ".join(name.split()).casefold()
 
 
 class Quote(TimestampedModel):
@@ -111,6 +120,59 @@ class Quote(TimestampedModel):
 
     def __str__(self) -> str:
         return f"Cotización {self.pk} — {self.client}"
+
+    def room_names(self) -> list[str]:
+        """The rooms of the quote: its section, then those its lines use.
+
+        A quote made before the section existed —or from a plan— has rooms only
+        in its lines; they are its rooms too, alphabetically after the listed
+        ones. Reads what is prefetched (``rooms``, ``items__rooms``).
+        """
+        names = [room.name for room in self.rooms.all()]
+        keys = {room_key(name) for name in names}
+        extra: dict[str, str] = {}
+        for item in self.items.all():
+            for share in item.rooms.all():
+                key = room_key(share.name)
+                if key not in keys:
+                    extra.setdefault(key, share.name)
+        return names + sorted(extra.values(), key=room_key)
+
+
+class QuoteRoom(TimestampedModel):
+    """A room of the quote's «Habitaciones» section (iteracion-31, US-10).
+
+    The architect lists the rooms of the job —in their order, even before they
+    hold any service— and puts each line added by hand in one of them. The
+    breakdown of the document still comes from the lines (``QuoteItemRoom``):
+    this is the list the screen offers, which is why a room without lines
+    never reaches the document.
+    """
+
+    quote = models.ForeignKey(
+        Quote,
+        on_delete=models.CASCADE,
+        related_name="rooms",
+        verbose_name=_("cotización"),
+    )
+    name = models.CharField(
+        max_length=ROOM_NAME_MAX_LENGTH, verbose_name=_("habitación")
+    )
+    position = models.PositiveSmallIntegerField(default=0, verbose_name=_("orden"))
+
+    class Meta:
+        db_table = "quotes_quote_room"
+        ordering = ["position", "created_at"]
+        verbose_name = _("habitación de la cotización")
+        verbose_name_plural = _("habitaciones de la cotización")
+        constraints = [
+            models.UniqueConstraint(
+                Lower("name"), "quote", name="quotes_quote_room_once"
+            )
+        ]
+
+    def __str__(self) -> str:
+        return self.name
 
 
 class QuoteItem(TimestampedModel):

@@ -11,7 +11,14 @@ from apps.clients.models import Client
 from apps.folios.codes import DocumentType
 from apps.folios.services import assign_folio
 from apps.planner.models import Plan
-from apps.quotes.models import DEFAULT_VALIDITY_DAYS, Quote, QuoteItem, QuoteItemRoom
+from apps.quotes.models import (
+    DEFAULT_VALIDITY_DAYS,
+    Quote,
+    QuoteItem,
+    QuoteItemRoom,
+    QuoteRoom,
+    room_key,
+)
 from apps.quotes.selectors import quotes_of
 from common.state_machine import Transitions, register
 
@@ -115,6 +122,35 @@ def _kept_rooms(previous: QuoteItem | None, quantity: Decimal) -> list[dict]:
     return rooms
 
 
+def _save_rooms(*, quote: Quote, names: list[str] | None) -> None:
+    """The quote's «Habitaciones» section after a write (iteracion-31).
+
+    ``names`` is the section the screen sent, in its order; ``None`` —a screen
+    that does not know of it— keeps the one it had. Either way every room a line
+    uses is in it: what the plan measures, or a line put in a room the section
+    left out, joins it at the end. A line's room takes the section's spelling,
+    so «cocina» and «Cocina» are one room in the document.
+    """
+    if names is None:
+        names = list(quote.rooms.values_list("name", flat=True))
+    canonical: dict[str, str] = {}
+    for name in names:
+        canonical.setdefault(room_key(name), name)
+    shares = list(QuoteItemRoom.objects.filter(quote_item__quote=quote))
+    for share in sorted(shares, key=lambda share: room_key(share.name)):
+        canonical.setdefault(room_key(share.name), share.name)
+    for share in shares:
+        name = canonical[room_key(share.name)]
+        if share.name != name:
+            share.name = name
+            share.save(update_fields=["name", "updated_at"])
+    quote.rooms.all().delete()
+    QuoteRoom.objects.bulk_create(
+        QuoteRoom(quote=quote, name=name, position=position)
+        for position, name in enumerate(canonical.values())
+    )
+
+
 @transaction.atomic
 def create_quote(
     *,
@@ -124,11 +160,13 @@ def create_quote(
     notes: str | None = None,
     validity_days: int | None = None,
     plan: Plan | None = None,
+    rooms: list[str] | None = None,
 ) -> Quote:
     """Create a draft quote for ``client`` with the given line items.
 
     Without a validity it gets the house one (20 days), which is what every
-    quote had before it could be changed.
+    quote had before it could be changed. ``rooms`` is its «Habitaciones»
+    section (iteracion-31).
     """
     _ensure_owned(owner=owner, client=client, items_data=items_data, plan=plan)
     quote = Quote.objects.create(
@@ -149,6 +187,7 @@ def create_quote(
             from_plan=bool(item.get("from_plan")),
             rooms=item.get("rooms"),
         )
+    _save_rooms(quote=quote, names=rooms)
     logger.info("Quote created", extra={"quote_id": str(quote.pk)})
     return quote
 
@@ -161,13 +200,15 @@ def update_quote(
     items_data: list[dict],
     notes: str | None = None,
     validity_days: int | None = None,
+    rooms: list[str] | None = None,
 ) -> Quote:
     """Replace a quote's client and items; blocked once it is a project.
 
     A quote can be corrected as many times as the negotiation takes — its
     document is rebuilt from it every time — and stops changing when work has
     started on it, because from then on there are advances measured against it.
-    ``notes`` and ``validity_days`` left out (``None``) keep what it had.
+    ``notes``, ``validity_days`` and ``rooms`` (its «Habitaciones» section,
+    iteracion-31) left out (``None``) keep what it had.
 
     Raises:
         ValidationError: the quote is already a project.
@@ -175,6 +216,7 @@ def update_quote(
     quote = lock_quote(quote=quote)
     QUOTE_TRANSITIONS.ensure_editable(quote, message=IN_PROJECT_NOT_EDITABLE)
     _ensure_owned(owner=quote.owner, client=client, items_data=items_data)
+    rooms_section = rooms
     quote.client = client
     fields = ["client", "updated_at"]
     if notes is not None:
@@ -208,6 +250,7 @@ def update_quote(
             from_plan=from_plan,
             rooms=rooms,
         )
+    _save_rooms(quote=quote, names=rooms_section)
     return quote
 
 
@@ -255,6 +298,8 @@ def sync_quote_with_plan(*, quote: Quote, plan: Plan, items_data: list[dict]) ->
             _add_rooms(item=line, rooms=data.get("rooms") or [])
     quote.items.filter(from_plan=True).exclude(tariff_id__in=measured).delete()
 
+    # Las habitaciones del plano se suman al apartado (iteracion-31).
+    _save_rooms(quote=quote, names=None)
     quote.plan = plan
     quote.save(update_fields=["plan", "updated_at"])
     logger.info("Quote synced with its plan", extra={"quote_id": str(quote.pk)})
