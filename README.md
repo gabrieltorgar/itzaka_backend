@@ -14,8 +14,9 @@ con su comprobante, hasta el cierre del proyecto con documento resumen.
   eliminación de la cuenta.
 - **Catálogo, clientes y cotizaciones:** servicios con su unidad y precio,
   clientes y cotizaciones con total automático, con su documento PDF que se
-  descarga o se envía por correo; la que sale de un plano guarda cuánto de cada
-  partida cae en cada habitación, para desglosarla por habitación.
+  descarga o se envía por correo; cada cotización tiene su apartado de
+  habitaciones y cada partida dice cuánto de ella cae en cada una (a mano, entera
+  en una; desde un plano, lo que él mide), para desglosarla por habitación.
 - **Proyectos, avances y cierre:** una cotización se vuelve proyecto; los avances
   se registran por cantidad con evidencia fotográfica y el cierre entrega su
   documento resumen.
@@ -38,7 +39,7 @@ con su comprobante, hasta el cierre del proyecto con documento resumen.
 
 <!-- readme:auto:version -->
 
-**Versión:** 7.2.0 — `pyproject.toml` · historial en [CHANGELOG.md](CHANGELOG.md)
+**Versión:** 7.3.0 — `pyproject.toml` · historial en [CHANGELOG.md](CHANGELOG.md)
 
 <!-- /readme:auto:version -->
 

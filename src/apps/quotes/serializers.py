@@ -9,12 +9,14 @@ from apps.clients.models import Client
 from apps.planner.models import Plan
 from apps.quotes.models import (
     MAX_ROOMS_PER_ITEM,
+    MAX_ROOMS_PER_QUOTE,
     MAX_VALIDITY_DAYS,
     NOTES_MAX_LENGTH,
     ROOM_NAME_MAX_LENGTH,
     Quote,
     QuoteItem,
     QuoteItemRoom,
+    room_key,
 )
 from common.fields import OwnedPrimaryKeyRelatedField
 
@@ -92,7 +94,7 @@ class QuoteItemInputSerializer(serializers.Serializer):
     def validate(self, attrs: dict) -> dict:
         """The rooms of a line are each named once and never exceed the line."""
         rooms = attrs.get("rooms") or []
-        names = [room["name"] for room in rooms]
+        names = [room_key(room["name"]) for room in rooms]
         if len(set(names)) != len(names):
             raise serializers.ValidationError(
                 {"rooms": ["Cada habitación va una sola vez en la partida"]}
@@ -107,6 +109,22 @@ class QuoteItemInputSerializer(serializers.Serializer):
                 }
             )
         return attrs
+
+
+class QuoteRoomInputSerializer(serializers.Serializer):
+    """A room of the quote's «Habitaciones» section (iteracion-31)."""
+
+    name = serializers.CharField(
+        max_length=ROOM_NAME_MAX_LENGTH,
+        error_messages={
+            "blank": "Escribe el nombre de la habitación",
+            "required": "Escribe el nombre de la habitación",
+            "max_length": (
+                "El nombre de la habitación no puede pasar de "
+                f"{ROOM_NAME_MAX_LENGTH} caracteres"
+            ),
+        },
+    )
 
 
 class QuoteWriteSerializer(serializers.Serializer):
@@ -147,6 +165,35 @@ class QuoteWriteSerializer(serializers.Serializer):
             "invalid": "La vigencia debe ser un número de días",
         },
     )
+
+    # El apartado «Habitaciones» (iteracion-31). Sin decirlo, conserva el que
+    # tenía: una pantalla anterior no lo manda.
+    rooms = QuoteRoomInputSerializer(
+        many=True,
+        required=False,
+        max_length=MAX_ROOMS_PER_QUOTE,
+        error_messages={
+            "max_length": (
+                f"Una cotización lleva como mucho {MAX_ROOMS_PER_QUOTE} habitaciones"
+            )
+        },
+    )
+
+    def validate_rooms(self, value: list) -> list:
+        """Each room is named once; the error goes on the repeated row.
+
+        Same shape as the errors of the rows themselves: by row index.
+        """
+        seen: set[str] = set()
+        errors: dict[int, dict] = {}
+        for index, room in enumerate(value):
+            key = room_key(room["name"])
+            if key in seen:
+                errors[index] = {"name": ["Esa habitación ya está en la cotización"]}
+            seen.add(key)
+        if errors:
+            raise serializers.ValidationError(errors)
+        return value
 
     def validate_items(self, value: list) -> list:
         if not value:
@@ -201,6 +248,9 @@ class QuoteSerializer(serializers.ModelSerializer):
     client_name = serializers.CharField(source="client.name", read_only=True)
     plan_name = serializers.CharField(source="plan.name", read_only=True, default=None)
     total = serializers.SerializerMethodField()
+    # El apartado «Habitaciones» (iteracion-31): las guardadas en su orden y,
+    # detrás, las que usan sus partidas sin estar en él.
+    rooms = serializers.SerializerMethodField()
 
     class Meta:
         model = Quote
@@ -212,6 +262,7 @@ class QuoteSerializer(serializers.ModelSerializer):
             "status",
             "plan",
             "plan_name",
+            "rooms",
             "items",
             "total",
             "notes",
@@ -221,6 +272,9 @@ class QuoteSerializer(serializers.ModelSerializer):
         # Forma de lectura: crear y editar pasan por QuoteWriteSerializer, y el
         # estado lo cambia sólo la conversión en proyecto (SEC-03).
         read_only_fields = ["folio", "status", "created_at"]
+
+    def get_rooms(self, obj: Quote) -> list[dict]:
+        return [{"name": name} for name in obj.room_names()]
 
     def get_total(self, obj: Quote) -> Decimal:
         return sum((item.subtotal for item in obj.items.all()), Decimal("0"))

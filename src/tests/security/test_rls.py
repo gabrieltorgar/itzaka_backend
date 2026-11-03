@@ -48,6 +48,7 @@ OWNER_PATHS = {
     "projects_evidence": "progress__project__owner",
     "quotes_quote_item": "quote__owner",
     "quotes_quote_item_room": "quote_item__quote__owner",
+    "quotes_quote_room": "quote__owner",
     "staff_workerservice": "worker__owner",
     "staff_assignment": "project__owner",
 }
